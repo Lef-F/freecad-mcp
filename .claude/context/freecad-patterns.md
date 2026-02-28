@@ -118,3 +118,6 @@ FreeCAD.Console.PrintError("Error\n")
 - `obj.ViewObject` is only available when FreeCADGui is loaded
 - `saveImage()` fails on TechDraw, Spreadsheet, and Drawing views
 - FreeCAD's embedded Python version may differ from the system Python
+- **Version compatibility**: Guard `isinstance` checks on FreeCAD types with `hasattr` (e.g., `hasattr(App, "Color") and isinstance(value, App.Color)`). Some types don't exist in all FreeCAD versions.
+- **Screenshot size**: Always pass explicit `width`/`height` dimensions for MCP responses to avoid oversized images on high-DPI displays
+- **Serialization safety**: `serialize_value()` must never raise — catch exceptions and fall back to `str(value)`. See `.claude/context/known-issues.md` for details.

@@ -56,3 +56,10 @@ When remote connections are enabled:
 - Server binds to `0.0.0.0` instead of `localhost`
 - `FilteredXMLRPCServer` validates client IPs against allowed list (supports CIDR)
 - MCP server accepts `--host` flag to connect to remote FreeCAD instances
+
+## Compatibility Notes
+
+- **Tested against**: FreeCAD 1.0.2
+- **API differences**: Some types (e.g., `FreeCAD.Color`) don't exist in all versions. See `.claude/context/known-issues.md` for details.
+- **Serialization safety**: `serialize.py` must use `hasattr` guards before `isinstance` checks on version-dependent types
+- **Screenshot defaults**: Viewport dimensions are used when `width`/`height` are omitted, which can produce large images on high-DPI displays

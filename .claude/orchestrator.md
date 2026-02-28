@@ -16,6 +16,7 @@ Determine which area(s) the user's request falls into:
 | `packaging` | pyproject.toml, versioning, PyPI distribution, entry points | `pyproject.toml` |
 | `examples` | ADK / LangChain integration examples | `examples/` |
 | `remote-access` | IP filtering, host validation, remote connection toggle | `addon/FreeCADMCP/rpc_server/rpc_server.py`, `src/freecad_mcp/server.py` |
+| `testing-compatibility` | Version-specific bugs, serialization issues, known limitations | `.claude/context/known-issues.md`, `addon/FreeCADMCP/rpc_server/serialize.py` |
 
 ## Step 2: Load context
 
@@ -25,6 +26,7 @@ Based on the classified area(s), load the relevant context files:
 - `mcp-server` or `rpc-handler` → Read `.claude/context/architecture.md`
 - `rpc-handler` or `serialization` → Read `.claude/context/freecad-patterns.md`
 - `mcp-server` (adding/modifying tools) → Read `.claude/context/tool-lifecycle.md`
+- `testing-compatibility` or `serialization` → Read `.claude/context/known-issues.md`
 - `packaging` or release work → Read skill `preparing-release`
 
 ## Step 3: Understand the two-component boundary

@@ -23,6 +23,7 @@
 - Property errors are caught per-property so one bad property doesn't abort the whole operation
 - Screenshot failures return `None` gracefully — the MCP tool handles the absence
 - Connection failures are logged and re-raised as exceptions to the MCP framework
+- Read-only RPC methods (`get_objects`, `get_object`) wrap `serialize_object()` calls in try/except and return `{"success": false, "error": ...}` on failure instead of leaking raw XML-RPC faults
 
 ## Naming Conventions
 
@@ -45,3 +46,10 @@
 - Don't add dependencies to pyproject.toml unless absolutely necessary (keep the MCP server lightweight)
 - Don't hardcode port 9875 in new locations — it's already defined in the RPC server and connection class
 - Don't modify `Init.py` — it must remain empty (FreeCAD convention)
+
+## Version Compatibility
+
+- Use `hasattr(App, "TypeName")` guards before `isinstance(value, App.TypeName)` checks for types that may not exist in all FreeCAD versions
+- Test against FreeCAD 1.0.2 as the baseline (some types like `App.Color` are missing)
+- Document new version requirements in `.claude/context/known-issues.md`
+- Serialization must never crash — unhandled types fall back to `str()`
