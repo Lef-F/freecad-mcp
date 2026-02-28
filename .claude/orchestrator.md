@@ -17,6 +17,7 @@ Determine which area(s) the user's request falls into:
 | `examples` | ADK / LangChain integration examples | `examples/` |
 | `remote-access` | IP filtering, host validation, remote connection toggle | `addon/FreeCADMCP/rpc_server/rpc_server.py`, `src/freecad_mcp/server.py` |
 | `testing-compatibility` | Version-specific bugs, serialization issues, known limitations | `.claude/context/known-issues.md`, `addon/FreeCADMCP/rpc_server/serialize.py` |
+| `freecad-modeling` | Collaborative CAD modeling sessions — building geometry, iterating with screenshots, human checkpoints | Use skill `modeling-in-freecad`; read `.claude/context/freecad-modeling-guide.md` |
 
 ## Step 2: Load context
 
@@ -28,6 +29,7 @@ Based on the classified area(s), load the relevant context files:
 - `mcp-server` (adding/modifying tools) → Read `.claude/context/tool-lifecycle.md`
 - `testing-compatibility` or `serialization` → Read `.claude/context/known-issues.md`
 - `packaging` or release work → Read skill `preparing-release`
+- `freecad-modeling` → Read `.claude/context/freecad-modeling-guide.md`, use skill `modeling-in-freecad`
 
 ## Step 3: Understand the two-component boundary
 
