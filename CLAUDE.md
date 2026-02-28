@@ -90,9 +90,13 @@ There is also a prompt `asset_creation_strategy` that guides LLMs through proper
 ## Development Setup
 
 ### Prerequisites
-- Python 3.12+ (see `.python-version`)
+- Python 3.11+ (see `.python-version`) — matches FreeCAD's bundled Python 3.11
 - `uv` package manager
 - FreeCAD installed locally
+
+> **Note:** FreeCAD bundles its **own Python 3.11** interpreter (verified: 3.11.13 in FreeCAD 1.0.2 on macOS).
+> Addon code in `addon/` runs under Python 3.11 — do not use Python 3.12+ syntax there.
+> See `.claude/context/known-issues.md` for how to verify the version locally on any platform.
 
 ### Install addon
 ```bash
@@ -139,6 +143,7 @@ uv run freecad-mcp --only-text-feedback --host 192.168.1.100
 
 Run before committing:
 ```bash
+uv sync --group dev   # installs ruff, mypy into the venv
 uv run ruff check src/
 uv run ruff format src/
 uv run mypy src/
