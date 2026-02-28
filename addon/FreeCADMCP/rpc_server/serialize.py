@@ -21,6 +21,8 @@ def serialize_value(value):
         return [serialize_value(v) for v in value]
     elif hasattr(App, "Color") and isinstance(value, App.Color):
         return list(value)
+    elif hasattr(App, "DocumentObject") and isinstance(value, App.DocumentObject):
+        return {"Name": value.Name, "Label": value.Label}
     else:
         return str(value)
 
@@ -40,11 +42,12 @@ def serialize_shape(shape):
 def serialize_view_object(view):
     if view is None:
         return None
-    return {
-        "ShapeColor": serialize_value(view.ShapeColor),
-        "Transparency": view.Transparency,
-        "Visibility": view.Visibility,
-    }
+    result = {"Visibility": view.Visibility}
+    if hasattr(view, "ShapeColor"):
+        result["ShapeColor"] = serialize_value(view.ShapeColor)
+    if hasattr(view, "Transparency"):
+        result["Transparency"] = view.Transparency
+    return result
 
 
 def serialize_object(obj):

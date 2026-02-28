@@ -150,7 +150,7 @@ mcp = FastMCP(
 _freecad_connection: FreeCADConnection | None = None
 
 
-def get_freecad_connection():
+def get_freecad_connection() -> FreeCADConnection:
     """Get or create a persistent FreeCAD connection"""
     global _freecad_connection
     if _freecad_connection is None:
@@ -165,22 +165,23 @@ def get_freecad_connection():
 
 
 # Helper function to safely add screenshot to response
-def add_screenshot_if_available(response, screenshot):
+def add_screenshot_if_available(
+    response: list[TextContent], screenshot: str | None
+) -> list[TextContent | ImageContent]:
     """Safely add screenshot to response only if it's available"""
+    result: list[TextContent | ImageContent] = list(response)
     if screenshot is not None and not _only_text_feedback:
-        response.append(
-            ImageContent(type="image", data=screenshot, mimeType="image/png")
-        )
+        result.append(ImageContent(type="image", data=screenshot, mimeType="image/png"))
     elif not _only_text_feedback:
         # Add an informative message that will be seen by the AI model and user
-        response.append(
+        result.append(
             TextContent(
                 type="text",
                 text="Note: Visual preview is unavailable in the current view type (such as TechDraw or Spreadsheet). "
                 "Switch to a 3D view to see visual feedback.",
             )
         )
-    return response
+    return result
 
 
 @mcp.tool()
@@ -355,7 +356,9 @@ def create_object(
             "Analysis": analysis_name,
         }
         res = freecad.create_object(doc_name, obj_data)
-        screenshot = freecad.get_active_screenshot()
+        screenshot = (
+            freecad.get_active_screenshot() if not _only_text_feedback else None
+        )
 
         if res["success"]:
             response = [
@@ -395,7 +398,9 @@ def edit_object(
     freecad = get_freecad_connection()
     try:
         res = freecad.edit_object(doc_name, obj_name, {"Properties": obj_properties})
-        screenshot = freecad.get_active_screenshot()
+        screenshot = (
+            freecad.get_active_screenshot() if not _only_text_feedback else None
+        )
 
         if res["success"]:
             response = [
@@ -431,7 +436,9 @@ def delete_object(
     freecad = get_freecad_connection()
     try:
         res = freecad.delete_object(doc_name, obj_name)
-        screenshot = freecad.get_active_screenshot()
+        screenshot = (
+            freecad.get_active_screenshot() if not _only_text_feedback else None
+        )
 
         if res["success"]:
             response = [
@@ -466,7 +473,9 @@ def execute_code(ctx: Context, code: str) -> list[TextContent | ImageContent]:
     freecad = get_freecad_connection()
     try:
         res = freecad.execute_code(code)
-        screenshot = freecad.get_active_screenshot()
+        screenshot = (
+            freecad.get_active_screenshot() if not _only_text_feedback else None
+        )
 
         if res["success"]:
             response = [
@@ -526,6 +535,10 @@ def get_view(
     Returns:
         A screenshot of the active view.
     """
+    if _only_text_feedback:
+        return [
+            TextContent(type="text", text="Screenshot not available in text-only mode.")
+        ]
     freecad = get_freecad_connection()
     screenshot = freecad.get_active_screenshot(view_name, width, height, focus_object)
 
@@ -555,7 +568,9 @@ def insert_part_from_library(
     freecad = get_freecad_connection()
     try:
         res = freecad.insert_part_from_library(relative_path)
-        screenshot = freecad.get_active_screenshot()
+        screenshot = (
+            freecad.get_active_screenshot() if not _only_text_feedback else None
+        )
 
         if res["success"]:
             response = [
@@ -601,7 +616,9 @@ def get_objects(ctx: Context, doc_name: str) -> list[TextContent | ImageContent]
                     type="text", text=f"Error: {result.get('error', 'Unknown error')}"
                 )
             ]
-        screenshot = freecad.get_active_screenshot()
+        screenshot = (
+            freecad.get_active_screenshot() if not _only_text_feedback else None
+        )
         response = [
             TextContent(type="text", text=json.dumps(result["objects"])),
         ]
@@ -634,7 +651,9 @@ def get_object(
                     type="text", text=f"Error: {result.get('error', 'Unknown error')}"
                 )
             ]
-        screenshot = freecad.get_active_screenshot()
+        screenshot = (
+            freecad.get_active_screenshot() if not _only_text_feedback else None
+        )
         response = [
             TextContent(type="text", text=json.dumps(result["object"])),
         ]
@@ -721,7 +740,7 @@ def _validate_host(value: str) -> str:
     )
 
 
-def main():
+def main() -> None:
     """Run the MCP server"""
     global _only_text_feedback, _rpc_host
     import argparse

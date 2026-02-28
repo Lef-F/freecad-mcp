@@ -12,6 +12,8 @@ def insert_part_from_library(relative_path):
     if not os.path.exists(part_path):
         raise FileNotFoundError(f"Not found: {part_path}")
 
+    if FreeCADGui.ActiveDocument is None:
+        raise RuntimeError("No active document. Please open or create a document first.")
     FreeCADGui.ActiveDocument.mergeProject(part_path)
 
 

@@ -1,6 +1,9 @@
+import os as _os
+
 class FreeCADMCPAddonWorkbench(Workbench):
     MenuText = "MCP Addon"
     ToolTip = "Addon for MCP Communication"
+    Icon = _os.path.join(_os.path.dirname(__file__), "mcp_workbench.svg")
 
     def Initialize(self):
         from rpc_server import rpc_server

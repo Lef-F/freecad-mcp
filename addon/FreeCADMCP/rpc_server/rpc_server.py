@@ -205,7 +205,12 @@ def set_object_property(
 
                 elif prop == "References" and isinstance(val, list):
                     refs = []
-                    for ref_name, face in val:
+                    for ref_item in val:
+                        if isinstance(ref_item, dict):
+                            ref_name = ref_item.get("object_name")
+                            face = ref_item.get("face")
+                        else:
+                            ref_name, face = ref_item
                         ref_obj = doc.getObject(ref_name)
                         if ref_obj:
                             refs.append((ref_obj, face))
@@ -217,12 +222,22 @@ def set_object_property(
                     setattr(obj, prop, val)
             # ShapeColor is a property of the ViewObject
             elif prop == "ShapeColor" and isinstance(val, (list, tuple)):
-                setattr(obj.ViewObject, prop, (float(val[0]), float(val[1]), float(val[2]), float(val[3])))
+                try:
+                    if len(val) < 4:
+                        raise ValueError(f"ShapeColor requires 4 values, got {len(val)}")
+                    setattr(obj.ViewObject, prop, (float(val[0]), float(val[1]), float(val[2]), float(val[3])))
+                except (ValueError, TypeError, IndexError) as e:
+                    FreeCAD.Console.PrintError(f"Invalid ShapeColor value: {e}\n")
 
             elif prop == "ViewObject" and isinstance(val, dict):
                 for k, v in val.items():
                     if k == "ShapeColor":
-                        setattr(obj.ViewObject, k, (float(v[0]), float(v[1]), float(v[2]), float(v[3])))
+                        try:
+                            if len(v) < 4:
+                                raise ValueError(f"ShapeColor requires 4 values, got {len(v)}")
+                            setattr(obj.ViewObject, k, (float(v[0]), float(v[1]), float(v[2]), float(v[3])))
+                        except (ValueError, TypeError, IndexError) as e:
+                            FreeCAD.Console.PrintError(f"Invalid ShapeColor value: {e}\n")
                     else:
                         setattr(obj.ViewObject, k, v)
 
@@ -241,7 +256,10 @@ class FreeCADRPC:
 
     def create_document(self, name="New_Document"):
         rpc_request_queue.put(lambda: self._create_document_gui(name))
-        res = rpc_response_queue.get()
+        try:
+            res = rpc_response_queue.get(timeout=30)
+        except queue.Empty:
+            return {"success": False, "error": "GUI task timed out. FreeCAD may be unresponsive."}
         if res is True:
             return {"success": True, "document_name": name}
         else:
@@ -255,7 +273,10 @@ class FreeCADRPC:
             properties=obj_data.get("Properties", {}),
         )
         rpc_request_queue.put(lambda: self._create_object_gui(doc_name, obj))
-        res = rpc_response_queue.get()
+        try:
+            res = rpc_response_queue.get(timeout=30)
+        except queue.Empty:
+            return {"success": False, "error": "GUI task timed out. FreeCAD may be unresponsive."}
         if res is True:
             return {"success": True, "object_name": obj.name}
         else:
@@ -267,7 +288,10 @@ class FreeCADRPC:
             properties=properties.get("Properties", {}),
         )
         rpc_request_queue.put(lambda: self._edit_object_gui(doc_name, obj))
-        res = rpc_response_queue.get()
+        try:
+            res = rpc_response_queue.get(timeout=30)
+        except queue.Empty:
+            return {"success": False, "error": "GUI task timed out. FreeCAD may be unresponsive."}
         if res is True:
             return {"success": True, "object_name": obj.name}
         else:
@@ -275,7 +299,10 @@ class FreeCADRPC:
 
     def delete_object(self, doc_name: str, obj_name: str):
         rpc_request_queue.put(lambda: self._delete_object_gui(doc_name, obj_name))
-        res = rpc_response_queue.get()
+        try:
+            res = rpc_response_queue.get(timeout=30)
+        except queue.Empty:
+            return {"success": False, "error": "GUI task timed out. FreeCAD may be unresponsive."}
         if res is True:
             return {"success": True, "object_name": obj_name}
         else:
@@ -296,7 +323,10 @@ class FreeCADRPC:
                 return f"Error executing Python code: {e}\n"
 
         rpc_request_queue.put(task)
-        res = rpc_response_queue.get()
+        try:
+            res = rpc_response_queue.get(timeout=30)
+        except queue.Empty:
+            return {"success": False, "error": "GUI task timed out. FreeCAD may be unresponsive."}
         if res is True:
             return {
                 "success": True,
@@ -330,7 +360,10 @@ class FreeCADRPC:
 
     def insert_part_from_library(self, relative_path):
         rpc_request_queue.put(lambda: self._insert_part_from_library(relative_path))
-        res = rpc_response_queue.get()
+        try:
+            res = rpc_response_queue.get(timeout=30)
+        except queue.Empty:
+            return {"success": False, "error": "GUI task timed out. FreeCAD may be unresponsive."}
         if res is True:
             return {"success": True, "message": "Part inserted from library."}
         else:
@@ -342,7 +375,7 @@ class FreeCADRPC:
     def get_parts_list(self):
         return get_parts_list()
 
-    def get_active_screenshot(self, view_name: str = "Isometric", width: int | None = None, height: int | None = None, focus_object: str | None = None) -> str:
+    def get_active_screenshot(self, view_name: str = "Isometric", width: int | None = None, height: int | None = None, focus_object: str | None = None) -> str | None:
         """Get a screenshot of the active view.
         
         Returns a base64-encoded string of the screenshot or None if a screenshot
@@ -365,31 +398,47 @@ class FreeCADRPC:
                 return False
                 
         rpc_request_queue.put(check_view_supports_screenshots)
-        supports_screenshots = rpc_response_queue.get()
-        
+        try:
+            supports_screenshots = rpc_response_queue.get(timeout=30)
+        except queue.Empty:
+            FreeCAD.Console.PrintWarning("Timed out checking screenshot support\n")
+            return None
+
         if not supports_screenshots:
             FreeCAD.Console.PrintWarning("Current view does not support screenshots\n")
             return None
-            
+
         # If view supports screenshots, proceed with capture
         fd, tmp_path = tempfile.mkstemp(suffix=".png")
         os.close(fd)
         rpc_request_queue.put(
             lambda: self._save_active_screenshot(tmp_path, view_name, width, height, focus_object)
         )
-        res = rpc_response_queue.get()
+        try:
+            res = rpc_response_queue.get(timeout=30)
+        except queue.Empty:
+            try:
+                os.remove(tmp_path)
+            except FileNotFoundError:
+                pass
+            FreeCAD.Console.PrintWarning("Timed out waiting for screenshot capture\n")
+            return None
         if res is True:
             try:
                 with open(tmp_path, "rb") as image_file:
                     image_bytes = image_file.read()
                     encoded = base64.b64encode(image_bytes).decode("utf-8")
             finally:
-                if os.path.exists(tmp_path):
+                try:
                     os.remove(tmp_path)
+                except FileNotFoundError:
+                    pass
             return encoded
         else:
-            if os.path.exists(tmp_path):
+            try:
                 os.remove(tmp_path)
+            except FileNotFoundError:
+                pass
             FreeCAD.Console.PrintWarning(f"Failed to capture screenshot: {res}\n")
             return None
 
@@ -475,7 +524,12 @@ class FreeCADRPC:
             # For Fem::ConstraintFixed
             if hasattr(obj_ins, "References") and "References" in obj.properties:
                 refs = []
-                for ref_name, face in obj.properties["References"]:
+                for ref_item in obj.properties["References"]:
+                    if isinstance(ref_item, dict):
+                        ref_name = ref_item.get("object_name")
+                        face = ref_item.get("face")
+                    else:
+                        ref_name, face = ref_item
                     ref_obj = doc.getObject(ref_name)
                     if ref_obj:
                         refs.append((ref_obj, face))
@@ -606,7 +660,9 @@ def stop_rpc_server():
 
     if rpc_server_instance:
         rpc_server_instance.shutdown()
-        rpc_server_thread.join()
+        rpc_server_thread.join(timeout=5)
+        if rpc_server_thread.is_alive():
+            FreeCAD.Console.PrintWarning("RPC server thread did not stop within timeout\n")
         rpc_server_instance = None
         rpc_server_thread = None
         FreeCAD.Console.PrintMessage("RPC Server stopped.\n")
@@ -622,9 +678,10 @@ class StartRPCServerCommand:
     def Activated(self):
         msg = start_rpc_server()
         FreeCAD.Console.PrintMessage(msg + "\n")
+        FreeCADGui.updateGui()
 
     def IsActive(self):
-        return True
+        return rpc_server_instance is None
 
 
 class StopRPCServerCommand:
@@ -634,17 +691,20 @@ class StopRPCServerCommand:
     def Activated(self):
         msg = stop_rpc_server()
         FreeCAD.Console.PrintMessage(msg + "\n")
+        FreeCADGui.updateGui()
 
     def IsActive(self):
-        return True
+        return rpc_server_instance is not None
 
 
 class ToggleRemoteConnectionsCommand:
     def GetResources(self):
+        settings = load_settings()
         return {
             "MenuText": "Remote Connections",
             "ToolTip": "Enable or disable remote connections for the RPC server.",
             "Checkable": True,
+            "Checked": settings.get("remote_enabled", False),
         }
 
     def Activated(self, checked=0):
