@@ -125,18 +125,21 @@ class MyWorkbench(Workbench):
     Icon = os.path.join(os.path.dirname(__file__), "icon.svg")  # NameError: 'os' not defined
 ```
 
-**The correct pattern** (used by all built-in FreeCAD workbenches): set workbench attributes inside `Initialize()` using `self.__class__`:
+**The correct pattern**: set workbench attributes inside `Initialize()` using `self.__class__`. Do NOT use `__file__` — it is also not set in the exec scope. Instead, derive the addon directory from a real module's `__file__`:
 ```python
 class MyWorkbench(Workbench):
     MenuText = "My Addon"  # string literals are fine — no name lookup needed
 
     def Initialize(self):
-        import os  # imported inside the method, safe in any scope
-        self.__class__.Icon = os.path.join(os.path.dirname(__file__), "icon.svg")
+        import os
+        from rpc_server import rpc_server  # real module with a real __file__
+        # rpc_server/rpc_server.py → dirname → rpc_server/ → dirname → FreeCADMCP/
+        addon_dir = os.path.dirname(os.path.dirname(rpc_server.__file__))
+        self.__class__.Icon = os.path.join(addon_dir, "mcp_workbench.svg")
         # ... rest of initialization
 ```
 
-**Rule:** Never reference imported names in `InitGui.py` class bodies. Only string/number literals are safe there. Move all computed values into `Initialize()`, `Activated()`, or other methods.
+**Rule:** Never reference imported names in `InitGui.py` class bodies. Only string/number literals are safe there. Move all computed values into `Initialize()`, `Activated()`, or other methods. `__file__` is also unavailable — use a real module's `__file__` instead.
 
 ## Important Constraints
 
