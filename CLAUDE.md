@@ -67,6 +67,7 @@ Most mutation tools return a base64 PNG screenshot. The addon checks view compat
 - **`execute_code` always returns a screenshot**: Even for diagnostic/read-only queries, `execute_code` captures and returns a screenshot. Use `--only-text-feedback` or ignore the image to save tokens.
 - **Parts library dependency**: `get_parts_list` and `insert_part_from_library` require the optional [FreeCAD Parts Library addon](https://github.com/FreeCAD/FreeCAD-library). They return empty/error responses if it's not installed.
 - **Serialization fragility**: Unhandled FreeCAD types in `serialize_value()` fall back to `str()`. If `serialize_object()` itself raises, `get_objects`/`get_object` return `{"success": false, "error": ...}` instead of crashing.
+- **`InitGui.py` class body scoping**: FreeCAD loads `InitGui.py` via `exec()` without an explicit globals dict, so module-level imports are NOT visible inside class bodies (only string/number literals are safe there). Always set computed attributes like `Icon` inside `Initialize()` using `self.__class__.Icon = ...`. See `.claude/context/freecad-patterns.md` for the full explanation and source reference.
 
 ## MCP Tools Reference
 

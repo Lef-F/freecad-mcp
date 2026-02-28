@@ -112,6 +112,32 @@ FreeCAD.Console.PrintWarning("Warning\n")
 FreeCAD.Console.PrintError("Error\n")
 ```
 
+## InitGui.py Loading — Critical Scoping Trap
+
+FreeCAD loads `InitGui.py` via `exec(compile(f.read(), InstallFile, 'exec'))` with **no explicit globals/locals** (see `vendor/FreeCAD/src/Gui/FreeCADGuiInit.py`, `RunInitGuiPy()`, line ~143).
+
+**What this means:** Names imported at the top of `InitGui.py` (e.g. `import os`) are added to the *local scope of `RunInitGuiPy`*, not to the exec's globals. Class bodies look up free variables against the **exec's globals** (i.e. `FreeCADGuiInit.py`'s globals) — where those names don't exist. This causes `NameError` at class-definition time.
+
+**The trap:** This code fails:
+```python
+import os  # goes into RunInitGuiPy's locals
+class MyWorkbench(Workbench):
+    Icon = os.path.join(os.path.dirname(__file__), "icon.svg")  # NameError: 'os' not defined
+```
+
+**The correct pattern** (used by all built-in FreeCAD workbenches): set workbench attributes inside `Initialize()` using `self.__class__`:
+```python
+class MyWorkbench(Workbench):
+    MenuText = "My Addon"  # string literals are fine — no name lookup needed
+
+    def Initialize(self):
+        import os  # imported inside the method, safe in any scope
+        self.__class__.Icon = os.path.join(os.path.dirname(__file__), "icon.svg")
+        # ... rest of initialization
+```
+
+**Rule:** Never reference imported names in `InitGui.py` class bodies. Only string/number literals are safe there. Move all computed values into `Initialize()`, `Activated()`, or other methods.
+
 ## Important Constraints
 
 - All GUI operations must run on the Qt main thread (use the task queue)
