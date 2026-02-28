@@ -19,8 +19,8 @@ def serialize_value(value):
         }
     elif isinstance(value, (list, tuple)):
         return [serialize_value(v) for v in value]
-    elif isinstance(value, (App.Color)):
-        return tuple(value)
+    elif hasattr(App, "Color") and isinstance(value, App.Color):
+        return list(value)
     else:
         return str(value)
 

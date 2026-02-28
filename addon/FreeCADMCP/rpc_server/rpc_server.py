@@ -308,16 +308,25 @@ class FreeCADRPC:
     def get_objects(self, doc_name):
         doc = FreeCAD.getDocument(doc_name)
         if doc:
-            return [serialize_object(obj) for obj in doc.Objects]
+            try:
+                return {"success": True, "objects": [serialize_object(obj) for obj in doc.Objects]}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
         else:
-            return []
+            return {"success": False, "error": f"Document '{doc_name}' not found"}
 
     def get_object(self, doc_name, obj_name):
         doc = FreeCAD.getDocument(doc_name)
         if doc:
-            return serialize_object(doc.getObject(obj_name))
+            obj = doc.getObject(obj_name)
+            if obj is None:
+                return {"success": False, "error": f"Object '{obj_name}' not found in '{doc_name}'"}
+            try:
+                return {"success": True, "object": serialize_object(obj)}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
         else:
-            return None
+            return {"success": False, "error": f"Document '{doc_name}' not found"}
 
     def insert_part_from_library(self, relative_path):
         rpc_request_queue.put(lambda: self._insert_part_from_library(relative_path))
