@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "freecad": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "freecad-mcp"]
+    }
+  }
+}
