@@ -14,20 +14,14 @@ When implementing a new tool that LLM clients can invoke to interact with FreeCA
 
 ## Steps
 
+Follow `.claude/context/tool-lifecycle.md` for code templates. Summary:
+
 ### 1. Implement the RPC handler
 File: `addon/FreeCADMCP/rpc_server/rpc_server.py`
 
-Add a public method to `FreeCADRPC` class:
-- For mutations: put a lambda into `rpc_request_queue`, block on `rpc_response_queue.get()`
-- For reads: access FreeCAD objects directly
-- Return `{"success": True/False, ...}` dict
-- If the operation produces data, include it in the response dict
-
-If the operation needs GUI thread work, add a private `_method_gui()` helper that:
-- Executes on the main thread via the task queue
-- Wraps everything in try/except
-- Puts the result dict into `rpc_response_queue`
-- Calls `doc.recompute()` after mutations
+Add a public method to `FreeCADRPC` class that queues work and wraps the result.
+The `_gui` helper **returns** its result — `process_gui_tasks()` handles the queue.
+The public method wraps the raw return value into `{"success": bool, ...}` dict.
 
 ### 2. Add the connection method
 File: `src/freecad_mcp/server.py`
@@ -37,13 +31,8 @@ Add a method to `FreeCADConnection` that calls `self.server.<rpc_method>(...)`.
 ### 3. Define the MCP tool
 File: `src/freecad_mcp/server.py`
 
-Add a `@mcp.tool()` function:
-- Write a clear docstring (this is what the LLM sees to decide when to use the tool)
-- Call `get_connection()` to get the singleton
-- Invoke the connection method
-- Handle errors (check `result["success"]`)
-- Return `list[TextContent | ImageContent]`
-- Append screenshot if the tool mutates state and `_only_text_feedback` is False
+Add a `@mcp.tool()` function with `ctx: Context` as first parameter.
+Use `get_freecad_connection()` and `add_screenshot_if_available()`.
 
 ### 4. Update serialization (if needed)
 File: `addon/FreeCADMCP/rpc_server/serialize.py`

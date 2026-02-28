@@ -8,7 +8,7 @@ description: Diagnoses communication failures between the MCP server and the Fre
 ## When to Use
 When MCP tools fail with connection errors, timeouts, or unexpected responses from FreeCAD.
 
-## Diagnostic Steps
+## Steps
 
 ### 1. Verify FreeCAD RPC server is running
 - In FreeCAD: check the MCP Addon toolbar → "Start RPC Server" should have been clicked
@@ -45,7 +45,7 @@ If operations are accepted but never execute:
 - Try restarting the RPC server from the toolbar
 
 ### 6. Inspect RPC response
-Add temporary logging in `FreeCADRPC` methods to print the response dict before returning. Check FreeCAD's Python console for output.
+Add temporary logging in `FreeCADRPC` methods using `FreeCAD.Console.PrintMessage()` to print the response dict before returning. Check FreeCAD's Python console for output.
 
 ## Common Fixes
 
@@ -53,3 +53,8 @@ Add temporary logging in `FreeCADRPC` methods to print the response dict before 
 - **Wrong view**: Switch to 3D view before taking screenshots
 - **Stale connection**: The MCP server caches the connection — restart the MCP server to reconnect
 - **Property errors**: Check `obj.PropertiesList` to see valid property names for the object type
+
+## Verification
+- `ping()` returns `True` via raw XML-RPC connection
+- An MCP tool call succeeds end-to-end and returns expected data
+- Screenshots are returned as non-empty base64 strings (when in a supported view)

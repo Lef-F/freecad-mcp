@@ -5,7 +5,7 @@
 ### MCP Server (`src/`)
 - All tools defined in `server.py` using `@mcp.tool()` decorators
 - `FreeCADConnection` is the XML-RPC client wrapper — add methods here for new RPC calls
-- `get_connection()` provides the singleton connection instance (lazy init + ping check)
+- `get_freecad_connection()` provides the singleton connection instance (lazy init + ping check)
 - CLI argument parsing in `main()` at bottom of file
 - Server lifecycle managed via `server_lifespan` async context manager
 
@@ -28,7 +28,7 @@
 
 - MCP tool parameters: `doc_name`, `obj_name`, `obj_type`, `obj_properties`
 - RPC method names match MCP tool names where possible
-- GUI-thread helper methods prefixed with `_` and suffixed with `_gui` (e.g., `_create_object_gui`)
+- GUI-thread helper methods prefixed with `_` (e.g., `_create_object_gui`, `_save_active_screenshot`)
 - FreeCAD object types use their full qualified name (e.g., `Part::Box`, `Draft::Circle`, `Fem::FemMeshGmsh`)
 
 ## Testing Strategy

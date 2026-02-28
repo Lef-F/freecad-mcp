@@ -57,15 +57,21 @@ view = FreeCADGui.ActiveDocument.ActiveView
 view.viewIsometric()
 view.viewFront()
 view.viewTop()
-# ... viewRight, viewRear, viewLeft, viewBottom
+view.viewRight()
+view.viewBack()
+view.viewLeft()
+view.viewBottom()
+view.viewDimetric()
+view.viewTrimetric()
 
-# Screenshots
+# Screenshots (width/height are optional — omit to use viewport size)
 view.saveImage("/tmp/screenshot.png", width, height)
+view.saveImage("/tmp/screenshot.png")  # uses current viewport dimensions
 
-# Selection
+# Selection & fit
 FreeCADGui.Selection.addSelection(obj)
 FreeCADGui.Selection.clearSelection()
-view.viewAll()  # fit all objects
+view.fitAll()  # zoom to fit all objects
 ```
 
 ## FEM Objects

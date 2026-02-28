@@ -40,10 +40,10 @@ FreeCAD GUI operations must run on the main Qt thread. The addon uses a queue-ba
 - Results are returned via `rpc_response_queue`
 - The RPC thread blocks on `rpc_response_queue.get()` until the GUI thread responds
 
-This is in `addon/FreeCADMCP/rpc_server/rpc_server.py` (lines 136-147).
+See `rpc_request_queue`, `rpc_response_queue`, and `process_gui_tasks()` in `addon/FreeCADMCP/rpc_server/rpc_server.py`.
 
 ### Property Setting
-`set_object_property()` (rpc_server.py:158-233) handles complex type mapping:
+`set_object_property()` in `rpc_server.py` handles complex type mapping:
 - **Placement**: dict → `FreeCAD.Placement` (accepts both "Base" and "Position" keys)
 - **Vectors**: `{x, y, z}` dict → `FreeCAD.Vector`
 - **References**: object name strings → resolved FreeCAD object references
@@ -144,31 +144,29 @@ Do not include co-author lines in commits.
 
 ### Code Style
 - Follow existing patterns in each component
-- MCP tools use `get_connection()` to obtain the singleton `FreeCADConnection`
+- MCP tools use `get_freecad_connection()` to obtain the singleton `FreeCADConnection`
 - RPC methods return `{"success": bool, "error": str}` dicts
 - Property errors are caught per-property (don't fail the whole operation)
 - Use `FreeCAD.Console.PrintMessage/PrintError/PrintWarning()` for logging in addon code
 
 ### Adding a New MCP Tool
-1. Add the RPC method to `FreeCADRPC` class in `rpc_server.py`
-2. If it needs GUI thread access, use the queue pattern (put lambda → get response)
-3. Add the corresponding method to `FreeCADConnection` in `server.py`
-4. Add the `@mcp.tool()` decorated function in `server.py`
-5. Include a screenshot in the response if the tool mutates state
+See `.claude/context/tool-lifecycle.md` for the full step-by-step guide with code templates.
 
 ### Adding a New RPC Method
 1. Add the method to `FreeCADRPC` in `rpc_server.py`
 2. For GUI-thread work: put a lambda into `rpc_request_queue`, wait on `rpc_response_queue`
-3. For read-only operations (like `get_objects`): access FreeCAD directly (no queue needed)
+3. The `_gui` helper should **return** its result (not put it into the queue) — `process_gui_tasks()` handles the queue
+4. The public method wraps the raw result from the queue into `{"success": bool, ...}` dict
+5. For read-only operations (like `get_objects`): access FreeCAD directly (no queue needed)
 
 ## Important Constants
 
 | Constant | Value | Location |
 |----------|-------|----------|
 | RPC port | `9875` | rpc_server.py |
-| GUI task timer | 500ms | rpc_server.py:147 |
+| GUI task timer | 500ms | rpc_server.py (`process_gui_tasks`) |
 | Settings file | `freecad_mcp_settings.json` | rpc_server.py (in FreeCAD user data dir) |
-| Default allowed IPs | `127.0.0.1` | rpc_server.py:34 |
+| Default allowed IPs | `127.0.0.1` | rpc_server.py (`_DEFAULT_SETTINGS`) |
 
 ## Dependencies
 

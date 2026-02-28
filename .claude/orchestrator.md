@@ -12,10 +12,10 @@ Determine which area(s) the user's request falls into:
 | `rpc-handler` | XML-RPC methods, GUI task queue, property setting, FEM creation | `addon/FreeCADMCP/rpc_server/rpc_server.py` |
 | `serialization` | FreeCAD object → JSON conversion, shape/view/property serialization | `addon/FreeCADMCP/rpc_server/serialize.py` |
 | `parts-library` | Parts library search, insertion, caching | `addon/FreeCADMCP/rpc_server/parts_library.py` |
-| `addon-ui` | Workbench registration, menu commands, toolbar, settings UI | `addon/FreeCADMCP/InitGui.py` |
+| `addon-ui` | Workbench registration, menu commands, toolbar, settings UI | `addon/FreeCADMCP/InitGui.py`, `addon/FreeCADMCP/rpc_server/rpc_server.py` (GUI command classes) |
 | `packaging` | pyproject.toml, versioning, PyPI distribution, entry points | `pyproject.toml` |
 | `examples` | ADK / LangChain integration examples | `examples/` |
-| `remote-access` | IP filtering, host validation, remote connection toggle | `rpc_server.py`, `server.py` |
+| `remote-access` | IP filtering, host validation, remote connection toggle | `addon/FreeCADMCP/rpc_server/rpc_server.py`, `src/freecad_mcp/server.py` |
 
 ## Step 2: Load context
 

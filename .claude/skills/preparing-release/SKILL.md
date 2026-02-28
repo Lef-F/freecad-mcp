@@ -15,6 +15,7 @@ When changes are ready to be published as a new version on PyPI.
 uv run ruff check src/
 uv run ruff format --check src/
 uv run mypy src/
+uv run pytest
 ```
 
 ### 2. Check current version

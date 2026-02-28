@@ -23,7 +23,7 @@ FreeCAD Application (Qt main thread)
 - Manages a singleton `FreeCADConnection` (XML-RPC client)
 - Handles CLI args: `--only-text-feedback`, `--host`
 - Validates host with `validators` library
-- Lifecycle: connects on first tool call, graceful shutdown via lifespan context manager
+- Lifecycle: attempts connection at startup (warns if unavailable), reconnects lazily on first tool call if needed
 
 ### FreeCAD Addon (`addon/FreeCADMCP/`)
 - Registers as a FreeCAD Workbench with toolbar and menu
