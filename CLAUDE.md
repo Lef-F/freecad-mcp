@@ -98,14 +98,42 @@ There is also a prompt `asset_creation_strategy` that guides LLMs through proper
 > Addon code in `addon/` runs under Python 3.11 — do not use Python 3.12+ syntax there.
 > See `.claude/context/known-issues.md` for how to verify the version locally on any platform.
 
-### Install addon
+### Install / update addon (local dev)
+This is how you "deploy" the addon locally — copy `addon/FreeCADMCP` into FreeCAD's user Mod directory.
+Run this after every change to addon code to pick up changes in FreeCAD (requires FreeCAD restart).
+
 ```bash
-# Platform-specific Mod directory:
-# macOS:  ~/Library/Application\ Support/FreeCAD/Mod/
-# Linux:  ~/.FreeCAD/Mod/ or ~/.local/share/FreeCAD/Mod/
-# Snap:   ~/snap/freecad/common/Mod/
-# Windows: %APPDATA%\FreeCAD\Mod\
-cp -r addon/FreeCADMCP <MOD_DIR>/
+# macOS (confirmed path):
+cp -r addon/FreeCADMCP ~/Library/Application\ Support/FreeCAD/Mod/
+
+# Linux:
+cp -r addon/FreeCADMCP ~/.local/share/FreeCAD/Mod/   # or ~/.FreeCAD/Mod/
+
+# Linux Snap:
+cp -r addon/FreeCADMCP ~/snap/freecad/common/Mod/
+
+# Windows:
+# xcopy /E /I addon\FreeCADMCP %APPDATA%\FreeCAD\Mod\FreeCADMCP
+```
+
+Verify the copy is in sync (only `__pycache__` should differ):
+```bash
+diff -r addon/FreeCADMCP ~/Library/Application\ Support/FreeCAD/Mod/FreeCADMCP
+```
+
+### Claude Desktop config (local dev)
+The `~/Library/Application Support/Claude/claude_desktop_config.json` file is the config for the
+Claude Desktop app. Add the `freecad` entry under `mcpServers` (use the absolute path to this repo):
+
+```json
+{
+  "mcpServers": {
+    "freecad": {
+      "command": "/Users/lef/.local/bin/uv",
+      "args": ["--directory", "/Users/lef/Repos/lef/freecad-mcp", "run", "freecad-mcp"]
+    }
+  }
+}
 ```
 
 ### Clone FreeCAD source (for AI-assisted development)
@@ -121,18 +149,6 @@ See `.claude/context/freecad-source.md` for grep patterns and directory layout.
 uv run freecad-mcp
 # or with options:
 uv run freecad-mcp --only-text-feedback --host 192.168.1.100
-```
-
-### Claude Desktop config (development)
-```json
-{
-  "mcpServers": {
-    "freecad": {
-      "command": "uv",
-      "args": ["--directory", "/path/to/freecad-mcp", "run", "freecad-mcp"]
-    }
-  }
-}
 ```
 
 ## Code Quality
