@@ -472,14 +472,14 @@ def create_object(
                     text=f"Object '{res['object_name']}' created successfully",
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot, ctx)
+            return add_screenshot_if_available(response, screenshot, ctx, screenshot_attempted=capture_screenshot)
         else:
             response = [
                 TextContent(
                     type="text", text=f"Failed to create object: {res['error']}"
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot, ctx)
+            return add_screenshot_if_available(response, screenshot, ctx, screenshot_attempted=capture_screenshot)
     except Exception as e:
         logger.error(f"Failed to create object: {str(e)}")
         return [TextContent(type="text", text=f"Failed to create object: {str(e)}")]
@@ -520,12 +520,12 @@ def edit_object(
                     text=f"Object '{res['object_name']}' edited successfully",
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot, ctx)
+            return add_screenshot_if_available(response, screenshot, ctx, screenshot_attempted=capture_screenshot)
         else:
             response = [
                 TextContent(type="text", text=f"Failed to edit object: {res['error']}"),
             ]
-            return add_screenshot_if_available(response, screenshot, ctx)
+            return add_screenshot_if_available(response, screenshot, ctx, screenshot_attempted=capture_screenshot)
     except Exception as e:
         logger.error(f"Failed to edit object: {str(e)}")
         return [TextContent(type="text", text=f"Failed to edit object: {str(e)}")]
@@ -563,14 +563,14 @@ def delete_object(
                     text=f"Object '{res['object_name']}' deleted successfully",
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot, ctx)
+            return add_screenshot_if_available(response, screenshot, ctx, screenshot_attempted=capture_screenshot)
         else:
             response = [
                 TextContent(
                     type="text", text=f"Failed to delete object: {res['error']}"
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot, ctx)
+            return add_screenshot_if_available(response, screenshot, ctx, screenshot_attempted=capture_screenshot)
     except Exception as e:
         logger.error(f"Failed to delete object: {str(e)}")
         return [TextContent(type="text", text=f"Failed to delete object: {str(e)}")]
@@ -607,14 +607,14 @@ def execute_code(
                     type="text", text=f"Code executed successfully: {res['message']}"
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot, ctx)
+            return add_screenshot_if_available(response, screenshot, ctx, screenshot_attempted=capture_screenshot)
         else:
             response = [
                 TextContent(
                     type="text", text=f"Failed to execute code: {res['error']}"
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot, ctx)
+            return add_screenshot_if_available(response, screenshot, ctx, screenshot_attempted=capture_screenshot)
     except Exception as e:
         logger.error(f"Failed to execute code: {str(e)}")
         return [TextContent(type="text", text=f"Failed to execute code: {str(e)}")]
