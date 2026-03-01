@@ -1,0 +1,51 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run ruff check:*)",
+      "Bash(uv run ruff format:*)",
+      "Bash(uv run mypy:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(uv run freecad-mcp:*)",
+      "Bash(uv pip:*)",
+      "Bash(uv sync:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git status:*)",
+      "Bash(git branch:*)",
+      "Bash(git stash:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "mcp__freecad__list_documents",
+      "mcp__freecad__get_objects",
+      "mcp__freecad__get_view",
+      "mcp__freecad__get_parts_list",
+      "mcp__freecad__get_object",
+      "Bash(wc:*)",
+      "WebFetch",
+      "WebSearch",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__new_page",
+      "mcp__chrome-devtools__select_page",
+      "mcp__chrome-devtools__evaluate_script"
+    ],
+    "deny": []
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "freecad"
+  ],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "mcp__freecad__(execute_code|create_object|edit_object|delete_object|insert_part_from_library)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/auto-save.py"
+          }
+        ]
+      }
+    ]
+  }
+}
