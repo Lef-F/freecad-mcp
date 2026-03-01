@@ -29,8 +29,14 @@ Based on the classified area(s), load the relevant context files:
 - `mcp-server` (adding/modifying tools) → Read `.claude/context/tool-lifecycle.md`
 - `testing-compatibility` or `serialization` → Read `.claude/context/known-issues.md`
 - `packaging` or release work → Read skill `preparing-release`
-- `freecad-modeling` → Read `.claude/context/freecad-modeling-guide.md`, use skill `modeling-in-freecad`
-- `freecad-architecture` → Read `.claude/context/freecad-arch-guide.md`, use skill `architecting-in-freecad`; also read `freecad-modeling-guide.md` for base patterns
+- `freecad-modeling` → Read `.claude/context/freecad-modeling-guide.md`, use skill `modeling-in-freecad`; if working with rotated structures or local coordinate frames also read `.claude/context/freecad-origins.md`
+- `freecad-architecture` → Read `.claude/context/freecad-arch-guide.md`, use skill `architecting-in-freecad`; also read `freecad-modeling-guide.md` for base patterns; read `freecad-origins.md` for sketch attachment patterns
+- `viewport/visibility` → Read `.claude/context/freecad-visibility.md` and `.claude/context/freecad-origins.md`
+- `freecad-modeling` or `freecad-architecture` (grouping/organization) → Read `.claude/context/freecad-grouping.md`
+- `freecad-modeling` or `freecad-architecture` (TechDraw, technical drawings, sections) → Read `.claude/context/freecad-drawings.md`
+- `rpc-handler` or `serialization` or `mcp-server` (looking up FreeCAD API, property names, type strings) → Read `.claude/context/freecad-source.md`
+
+> **Note**: Swedish building code references (`arch-swe-*.md`, `bbr-reference.md`) are loaded lazily by the `architecting-in-freecad` skill — not directly by the orchestrator. The skill reads `bbr-reference.md` as an index, then loads individual topic files on demand.
 
 ## Step 3: Understand the two-component boundary
 

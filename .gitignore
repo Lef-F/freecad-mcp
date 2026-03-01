@@ -6,3 +6,4 @@ dist/
 vendor/
 .designs/
 .env
+.claude/settings.local.json

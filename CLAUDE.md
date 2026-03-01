@@ -201,6 +201,16 @@ This folder is gitignored (local only) but the convention is defined in `.claude
 
 See `.claude/context/designs-store.md` for the full convention: file structure, templates, and session lifecycle rules.
 
+### CRITICAL: Proprietary information stays in `.designs/`
+
+**Never write project-specific or proprietary information into any committed file.**
+
+Committed files (`.claude/context/`, `.claude/rules/`, `CLAUDE.md`, skill files, source code) are version-controlled and publicly visible. They must contain only **generic, reusable knowledge**: patterns, pitfalls, API references, conventions — nothing tied to a specific design project.
+
+All project-specific data — object names, dimensions, decisions, observations, coordinates, task lists — belongs **exclusively** in `.designs/<document-name>/` which is gitignored.
+
+When a design session surfaces a reusable insight (e.g., a modeling pitfall), generalize it completely before adding it to a committed context file. If it cannot be stated without referencing project specifics, it goes only in `.designs/`.
+
 ## Conventions
 
 ### Commits

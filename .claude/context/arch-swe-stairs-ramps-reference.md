@@ -74,6 +74,14 @@ PBL kunskapsbanken:
 
 > Note: Values from BBR training data — verify against current BBR avsnitt 8:232 for permit-stage calculations.
 
+### Railing height on rooftop gardens / terraces (design note)
+
+BBR 8:2322 requires **1,10 m** (1100 mm) measured from the **walkable surface** to the top of the railing.
+For a rooftop garden with soil retaining barriers:
+- Soil surface (the walkable surface) = roof slab top + soil depth (e.g. slab + 300mm soil)
+- If soil fills flush to barrier top, effective railing height = fence height alone (barrier doesn't add height)
+- Therefore: fence elements must be ≥ 1100 mm tall measured from soil surface, **not** from structural slab
+
 ---
 
 ## Evacuation Routes — BBR 5:3

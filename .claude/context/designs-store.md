@@ -53,6 +53,25 @@ Always check whether it exists first (`Glob` or `Read`) before creating.
 - Append new decisions or discoveries to `README.md`
 - Save any reusable script snippets to `scripts/`
 
+## Analysis Pitfalls to Avoid
+
+### Multi-object assembly coverage
+When analyzing whether a set of objects covers a boundary (e.g., fence perimeter), always check the COMBINED coverage of all objects together — never compare each object's BoundBox against the overall boundary in isolation. Two overlapping objects at a corner may fully cover the boundary even if neither individually does.
+
+**Anti-pattern**: "Object A's X-extent starts at -500 but the assembly east edge is at -1200 — there's a 700mm gap." (Wrong: Object B covers that range at the corner.)
+
+**Correct approach**: For each gap candidate, check whether any other object fills it before declaring a gap.
+
+### Terrain surface Z detection
+`terrain.Shape.common(box).BoundBox.ZMax` returns the top of the terrain SOLID at a given XY location. This works well for surface detection but can return false highs (e.g., Z_max=6500) when:
+- The sample XY is inside the terrain body interior (e.g., mid-slope on a hillside)
+- The terrain body has pockets that re-open at that XY
+
+Always verify terrain-Z readings visually or cross-check with known survey points.
+
+### tasks.md cleanup
+Exploration tasks that get answered during the session should be moved to Done immediately — don't leave them as Active once resolved. An Active task that has been implicitly resolved during the session misleads the next session into re-investigating something already known.
+
 ## File templates
 
 ### README.md

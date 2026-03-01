@@ -37,7 +37,7 @@ This skill extends `modeling-in-freecad` with architectural domain expertise. Al
 Before starting, always read:
 
 - **`reference/arch-api-reference.md`** — Arch.make* function signatures, key properties, and code patterns
-- **`.claude/context/freecad-arch-guide.md`** — Practical Arch modeling patterns
+- **`.claude/context/freecad-arch-guide.md`** — Practical Arch modeling patterns (levels, walls, openings, roof, sections, naming)
 
 Read `reference/architectural-standards.md` for generic/international defaults (room sizes, door widths, stair geometry). Note: values are generic — override with BBR when designing for Sweden (see below).
 
@@ -101,52 +101,15 @@ Update `objects.md` as objects are created during the session. At session end, m
 
 ### Define levels first
 
-Levels are the backbone of architectural design. Define them as a Python dict at the top of every `execute_code` block:
+Levels are the backbone of architectural design. Define them as a Python dict at the top of every `execute_code` block. **Never hardcode a z-coordinate.** Always reference `levels["Ground"]`, `levels["First"]`, etc.
 
-```python
-levels = {
-    "Foundation":  -200,
-    "Ground":         0,
-    "First":       3000,
-    "Roof":        6000,
-}
-floor_to_floor = 3000
-slab_t = 200
-wall_h = floor_to_floor - slab_t  # 2800mm clear
-```
-
-**Never hardcode a z-coordinate.** Always reference `levels["Ground"]`, `levels["First"]`, etc.
+See `freecad-arch-guide.md` > "Level Definitions" for the standard pattern.
 
 ### Create the BIM hierarchy
 
-```python
-import FreeCAD, Arch
+Create Site → Building → Floor(s) using `Arch.makeSite()`, `Arch.makeBuilding()`, `Arch.makeFloor()`. Nest them: elements → floor → building → site.
 
-doc = FreeCAD.newDocument("MyBuilding")
-
-# Create organizational hierarchy
-site = Arch.makeSite()
-site.Label = "Site"
-
-building = Arch.makeBuilding()
-building.Label = "Building"
-
-ground_floor = Arch.makeFloor()
-ground_floor.Label = "Ground Floor"
-ground_floor.Height = floor_to_floor
-
-first_floor = Arch.makeFloor()
-first_floor.Label = "First Floor"
-first_floor.Height = floor_to_floor
-first_floor.Placement.Base.z = levels["First"]
-
-# Nest: elements → floor → building → site
-building.Group = [ground_floor, first_floor]
-site.Group = [building]
-
-doc.recompute()
-print("BIM hierarchy created")
-```
+See `freecad-arch-guide.md` > "BIM Hierarchy" and `reference/arch-api-reference.md` > "Hierarchy" for function signatures.
 
 > **Checkpoint**: Show the hierarchy. Confirm levels and floor-to-floor heights before creating geometry.
 
@@ -156,44 +119,8 @@ print("BIM hierarchy created")
 
 Create the structural skeleton: slabs and load-bearing walls (or columns for frame structures).
 
-### Floor slabs
-
-Use `Arch.makeStructure()` for slabs:
-
-```python
-# Ground floor slab
-slab_gf = Arch.makeStructure(length=L, width=W, height=slab_t)
-slab_gf.Label = "Slab_Ground"
-slab_gf.Placement.Base = FreeCAD.Vector(0, 0, levels["Ground"] - slab_t)
-ground_floor.addObject(slab_gf)
-```
-
-### Load-bearing walls with baselines
-
-For precise wall placement, draw Draft baselines first:
-
-```python
-import Draft
-
-# South wall baseline
-p1 = FreeCAD.Vector(0, 0, levels["Ground"])
-p2 = FreeCAD.Vector(L, 0, levels["Ground"])
-baseline_south = Draft.make_line(p1, p2)
-
-wall_south = Arch.makeWall(baseline_south, height=wall_h, width=200)
-wall_south.Label = "Wall_GF_South"
-wall_south.Align = "Right"  # wall grows inward from baseline
-ground_floor.addObject(wall_south)
-```
-
-### Or walls without baselines (simpler)
-
-```python
-wall = Arch.makeWall(length=5000, width=200, height=wall_h)
-wall.Label = "Wall_GF_South"
-wall.Placement.Base = FreeCAD.Vector(0, 0, levels["Ground"])
-ground_floor.addObject(wall)
-```
+- **Slabs**: Use `Arch.makeStructure()` — see `arch-api-reference.md` > "Structures"
+- **Walls**: Use `Arch.makeWall()` with or without Draft baselines — see `freecad-arch-guide.md` > "Wall Creation Patterns"
 
 **Batch all walls for a floor in one `execute_code` block.** Name them by floor and orientation: `Wall_GF_South`, `Wall_GF_North`, `Wall_1F_East`, etc.
 
@@ -203,25 +130,9 @@ ground_floor.addObject(wall)
 
 ## Phase 4 — Enclosure & Partitions
 
-### Exterior walls
-
-Already created in Phase 3 if load-bearing. For frame structures, add non-structural exterior walls now.
-
 ### Interior partitions
 
-Interior walls are typically thinner (100-150mm):
-
-```python
-partition = Arch.makeWall(length=3000, width=150, height=wall_h)
-partition.Label = "Partition_GF_Kitchen"
-partition.Placement.Base = FreeCAD.Vector(5000, 0, levels["Ground"])
-partition.Placement.Rotation = FreeCAD.Rotation(FreeCAD.Vector(0, 0, 1), 90)
-ground_floor.addObject(partition)
-```
-
-### Wall types convention
-
-Define wall types at the top of your code:
+Interior walls are typically thinner (100-150mm). Define wall types at the top of your code:
 
 ```python
 wall_types = {
@@ -237,47 +148,11 @@ wall_types = {
 
 ## Phase 5 — Openings
 
-### Windows
+Use `Arch.makeWindowPreset()` for windows and doors. The `Hosts` property creates automatic wall cuts — no manual `Part::Cut` needed.
 
-`Arch.makeWindow()` with a preset type is the simplest approach:
+See `freecad-arch-guide.md` > "Openings" and `arch-api-reference.md` > "Windows & Doors" for function signatures and placement rules.
 
-```python
-# Create a window and insert it into a wall
-window = Arch.makeWindowPreset(
-    "Fixed",           # type: Fixed, Open 1-pane, Open 2-pane, Simple door, Glass door, etc.
-    width=1200,
-    height=1400,
-    h1=100, h2=100, h3=100,   # frame dimensions
-    w1=100, w2=100,
-    o1=0, o2=0
-)
-window.Label = "Window_GF_South_01"
-
-# Position the window on the wall
-window.Placement.Base = FreeCAD.Vector(1000, 0, levels["Ground"] + 800)
-
-# Attach to host wall (automatic boolean cut)
-window.Hosts = [wall_south]
-```
-
-### Doors
-
-Doors use the same `makeWindowPreset` with door types:
-
-```python
-door = Arch.makeWindowPreset(
-    "Simple door",
-    width=900, height=2100,
-    h1=100, h2=100, h3=100,
-    w1=100, w2=100,
-    o1=0, o2=0
-)
-door.Label = "Door_GF_Entry"
-door.Placement.Base = FreeCAD.Vector(2000, 0, levels["Ground"])
-door.Hosts = [wall_south]
-```
-
-**Window/door placement rule**: The position is relative to the wall's baseline. The `Hosts` property creates the automatic cut — no manual `Part::Cut` needed.
+**Window/door placement rule**: The position is relative to the wall's baseline.
 
 > **Checkpoint**: Show elevation views (`get_view("Front")`, `get_view("Right")`) to verify opening positions and sizes.
 
@@ -287,17 +162,7 @@ door.Hosts = [wall_south]
 
 ### Stairs
 
-```python
-stairs = Arch.makeStairs(height=floor_to_floor, width=1200, steps=16)
-stairs.Label = "Stairs_GF_to_1F"
-stairs.Placement.Base = FreeCAD.Vector(stair_x, stair_y, levels["Ground"])
-ground_floor.addObject(stairs)
-```
-
-Verify the stair geometry:
-- **Rise**: `floor_to_floor / steps` — should be 150-200mm
-- **Going (run)**: typically 250-300mm
-- **Rule of thumb**: `2 × rise + going = 600-650mm` (comfort formula)
+Use `Arch.makeStairs()` — see `arch-api-reference.md` > "Stairs" for parameters.
 
 Before creating stairs, verify locally:
 ```bash
@@ -312,24 +177,7 @@ print(f'footprint={n*run:.0f}mm x 1200mm')
 
 ### Slab openings for stairs
 
-If stairs pass through a floor slab, create a slab opening. This uses `Part::Box` + `Part::Cut` (there is no Arch-native slab opening tool):
-
-```python
-# Cut the opening in the upper floor slab
-hole = doc.addObject("Part::Box", "StairOpening_1F")
-hole.Length = stair_footprint + 100  # 50mm clearance each side
-hole.Width = 1200 + 100
-hole.Height = slab_t + 10
-hole.Placement.Base = FreeCAD.Vector(
-    stair_x - 50, stair_y - 50,
-    levels["First"] - 5
-)
-cut = doc.addObject("Part::Cut", "Slab_1F_Cut")
-cut.Base = slab_1f
-cut.Tool = hole
-hole.ViewObject.Visibility = False
-slab_1f.ViewObject.Visibility = False
-```
+If stairs pass through a floor slab, create a slab opening using `Part::Box` + `Part::Cut` (there is no Arch-native slab opening tool). See `freecad-arch-guide.md` > "Boolean Operations" for the pattern.
 
 > **Checkpoint**: Section view to verify stair connects both levels without clipping the slab.
 
@@ -337,34 +185,10 @@ slab_1f.ViewObject.Visibility = False
 
 ## Phase 7 — Roof
 
-### Flat roof
+- **Flat roof**: Use `Arch.makeStructure()` as a roof slab
+- **Pitched roof**: Create a closed wire at roof level, then `Arch.makeRoof()` with `angles` and `overhang` parameters. Do not pre-bake overhang into wire coordinates.
 
-```python
-roof_slab = Arch.makeStructure(length=L, width=W, height=slab_t)
-roof_slab.Label = "Slab_Roof"
-roof_slab.Placement.Base = FreeCAD.Vector(0, 0, levels["Roof"])
-building.addObject(roof_slab)  # or top floor
-```
-
-### Pitched roof
-
-Create a closed wire profile (the building wall footprint at roof level), then use `Arch.makeRoof()`. The `overhang` parameter adds the eave projection — do not pre-bake overhang into the wire coordinates.
-
-```python
-# Wire follows the building wall footprint (no overhang in coordinates)
-pts = [
-    FreeCAD.Vector(0, 0, levels["Roof"]),
-    FreeCAD.Vector(L, 0, levels["Roof"]),
-    FreeCAD.Vector(L, W, levels["Roof"]),
-    FreeCAD.Vector(0, W, levels["Roof"]),
-]
-wire = Draft.make_wire(pts, closed=True)
-
-# Hip roof (all four sides pitched)
-roof = Arch.makeRoof(wire, angles=[35, 35, 35, 35], overhang=[500, 500, 500, 500])
-roof.Label = "Roof"
-building.addObject(roof)
-```
+See `arch-api-reference.md` > "Roofs" for the function signature.
 
 > **Checkpoint**: Isometric view to verify roof sits correctly on walls.
 
@@ -374,16 +198,7 @@ building.addObject(roof)
 
 ### Multi-view verification
 
-Capture all standard views to check the design:
-
-```python
-# Run this check sequence
-views = ["Isometric", "Top", "Front", "Right"]
-```
-
-For each view, use `get_view(view_name, 400, 400)`.
-
-**What to verify:**
+Capture all standard views: `["Isometric", "Top", "Front", "Right"]` using `get_view(view_name, 400, 400)`.
 
 | View | Check |
 |------|-------|
@@ -392,65 +207,15 @@ For each view, use `get_view(view_name, 400, 400)`.
 | Right (elevation) | Building depth, stair position if visible |
 | Isometric | Overall massing, nothing floating or misaligned |
 
-### Section planes (advanced)
+### Section planes and dimensional checks
 
-For construction-quality sections:
-
-```python
-section = Arch.makeSectionPlane()
-section.Label = "Section_A"
-section.Placement.Base = FreeCAD.Vector(L/2, 0, 0)
-section.Placement.Rotation = FreeCAD.Rotation(FreeCAD.Vector(0, 0, 1), 90)
-```
-
-### Dimensional checks
-
-Create `Arch::Space` objects for rooms and verify areas:
-
-```python
-# Create a Space from an enclosing solid or from bounding walls
-space = Arch.makeSpace(objects=room_solid)  # pass a solid or list of (obj, face) tuples
-space.Label = "Space_GF_LivingRoom"
-ground_floor.addObject(space)
-
-doc.recompute()
-
-# Verify all spaces meet minimum area requirements
-for obj in doc.Objects:
-    if hasattr(obj, "IfcType") and obj.IfcType == "Space":
-        area = obj.Shape.Volume / 1e9 / (wall_h / 1000)  # approximate floor area in m²
-        print(f"{obj.Label}: ~{area:.1f} m²")
-```
+See `freecad-arch-guide.md` > "Sections" for section plane creation and `freecad-drawings.md` for TechDraw pipeline.
 
 > **Checkpoint**: "Here's the building from four views. Does the design match your intent? Any rooms to resize, openings to adjust, or elements to add?"
 
 ---
 
 ## Phase 9 — Refinement & Wrap-Up
-
-### Materials (optional)
-
-```python
-concrete = Arch.makeMaterial("Concrete")
-concrete.Color = (0.7, 0.7, 0.7, 1.0)
-
-brick = Arch.makeMaterial("Brick")
-brick.Color = (0.8, 0.4, 0.2, 1.0)
-
-# Assign to walls
-wall_south.Material = brick
-slab_gf.Material = concrete
-```
-
-### Visibility for presentation
-
-```python
-# Hide south and east walls for interior view
-for name in ["Wall_GF_South", "Wall_GF_East"]:
-    obj = doc.getObject(name)
-    if obj:
-        obj.ViewObject.Visibility = False
-```
 
 ### Final deliverables
 

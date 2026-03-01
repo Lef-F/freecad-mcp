@@ -128,13 +128,27 @@ Use `execute_code` for batches of related objects. Always:
 - Name objects descriptively (`WallSouth`, `Step01`, not `Box001`)
 - Zero-pad numbered series (`Step01`…`Step13`)
 - End every block with `doc.recompute()` and `print("Done")`
+- **Save after every verified batch**: `doc.save()` — FreeCAD crashes lose unsaved work
 
 ### 3c. Verify autonomously
 
-After execution, take a screenshot:
+After execution, use `analyze_view` (preferred over `get_view`) — it sends the screenshot to Gemini for visual analysis:
 ```
-get_view("Isometric", width=400, height=400)
+analyze_view("Isometric", width=400, height=400, prompt="Describe what you see...")
 ```
+
+**Before taking any screenshot:**
+1. Switch the active MDI window to the 3D view — see `freecad-modeling-guide.md` "Viewport Management" for the MDI switching pattern.
+2. Hide noise objects (see `freecad-visibility.md` for the full type list):
+```python
+noise = {"App::Origin", "App::Line", "App::Plane", "App::OriginFeature"}
+for obj in doc.Objects:
+    if hasattr(obj, "ViewObject") and obj.TypeId in noise:
+        obj.ViewObject.Visibility = False
+```
+3. Show only the objects relevant to the current task — not everything. Never run a blanket "make all objects visible" loop.
+
+**⚠️ CRITICAL: Never set `.Visibility = True` on `TechDraw::DrawPage` — it CRASHES FreeCAD** (see `freecad-visibility.md`).
 
 Check:
 - Are all expected objects visible?
@@ -148,7 +162,19 @@ If something looks wrong, diagnose before asking the user using the tiered query
 
 Fix silently if the cause is clear.
 
-### 3d. Human verification checkpoint
+### 3d. Save
+
+**Save the document after every successfully verified batch.** FreeCAD crashes lose all unsaved work. Save immediately after user approval.
+
+```python
+doc = FreeCAD.getDocument("my_doc")
+doc.save()   # saves to the existing .FCStd file path
+print("Saved.")
+```
+
+If the document has never been saved (no file path), skip and note it to the user — `doc.save()` will raise if there's no path. Use `doc.FileName` to check.
+
+### 3e. Human verification checkpoint
 
 Show the screenshot and summarize what was built. Ask:
 

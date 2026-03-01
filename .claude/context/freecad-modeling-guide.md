@@ -4,6 +4,57 @@ Practical lessons from building CAD models via the MCP server. Complements `free
 
 ---
 
+## Viewport Management
+
+### Always be in the 3D view before capturing screenshots
+
+`get_view` and `analyze_view` capture **whatever MDI window is currently active** — this can be a TechDraw drawing page, not the 3D model. Always switch to the 3D view explicitly:
+
+```python
+import FreeCADGui as Gui
+mdiArea = None
+for widget in Gui.getMainWindow().children():
+    if hasattr(widget, 'subWindowList'):
+        mdiArea = widget
+        break
+if mdiArea:
+    for w in mdiArea.subWindowList():
+        if w.windowTitle().startswith("my_doc_name"):   # match document name
+            mdiArea.setActiveSubWindow(w)
+            break
+Gui.SendMsgToActiveView("ViewFit")
+Gui.SendMsgToActiveView("ViewIsometric")
+```
+
+### Hide noise objects before any screenshot
+
+See `freecad-visibility.md` for the canonical always-hidden type list and cleanup scripts. Quick version for the common case:
+
+```python
+noise = {"App::Origin", "App::Line", "App::Plane", "App::OriginFeature"}
+for obj in doc.Objects:
+    if hasattr(obj, "ViewObject") and obj.TypeId in noise:
+        obj.ViewObject.Visibility = False
+```
+
+For documents with TechDraw pages, use the full `always_hidden_types` set from `freecad-visibility.md`.
+
+### Never do blanket visibility restore
+
+Setting all objects visible floods the viewport — a document with 30 Part/Body containers has 210+ origin objects. **Track which objects were visible before any exploration and restore only those.** See `freecad-visibility.md` for the full container hierarchy, propagation mechanism, and the "Final Objects" principle.
+
+---
+
+## Local Coordinate Systems (App::Origin and rotated App::Part)
+
+Every `App::Part` and `PartDesign::Body` automatically gets an `App::Origin` with 6 child features (3 axes + 3 planes). Access via `container.Origin.OriginFeatures[i]` — index order: [0] X_Axis, [1] Y_Axis, [2] Z_Axis, [3] XY_Plane, [4] XZ_Plane, [5] YZ_Plane.
+
+**Key pattern**: To model a rotated structure, create an `App::Part` with the rotation in its Placement, then model children in axis-aligned local coordinates. `world_pos = parent.Placement × child.Placement`.
+
+For full details, source references, and code examples: see `freecad-origins.md`.
+
+---
+
 ## Always Use Python for Calculations
 
 **Never compute numbers mentally.** Always derive coordinates and dimensions in Python — even for arithmetic that looks simple.
@@ -246,3 +297,8 @@ The `print` output is returned in the tool response — confirm success.
 - **Source objects in booleans**: do not delete `Base` or `Tool` objects used by `Part::Cut`/`Part::Fuse` — they remain parametrically linked; hide them instead
 - **Staircase top step**: with `(i+1) * rise` cumulative height and `n` steps where `n = H / rise`, the top surface of the last step lands exactly at `z = sz + H` (the underside of the upper floor slab) — verify this aligns before cutting the opening
 - **get_objects on large documents**: can time out or exceed token limits; use `execute_code` + targeted queries instead
+- **`Shape.BoundBox` and `.Vertexes` return world coordinates** (Placement already applied). They do NOT return shape-local coordinates. `obj.Shape.BoundBox.XMin` gives the actual world-space position.
+- **Rotated / non-axis-aligned geometry**: `Shape.BoundBox` is the axis-aligned bounding box of the rotated shape — larger than the actual footprint. For rotated objects, extract actual vertices (`obj.Shape.Vertexes`) and compute geometry from edge directions. Use `Part.makePolygon` + `Part.Face` + `face.extrude()` for solids aligned with actual edges.
+- **Multi-object assembly coverage**: never compare an individual object's BoundBox against the overall perimeter in isolation — multiple objects may jointly cover a boundary. See `designs-store.md` for the full anti-pattern.
+- **Terrain surface detection**: `solid.common(box).BoundBox.ZMax` can return false highs when sampling inside a hillside. See `designs-store.md` for details.
+- **Visibility pitfalls**: see `freecad-visibility.md` — covers blanket visibility restore, MDI window capture, TechDraw crash danger, and App::Origin noise.
