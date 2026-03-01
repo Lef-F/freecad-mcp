@@ -34,12 +34,29 @@ This skill extends `modeling-in-freecad` with architectural domain expertise. Al
 
 ## Reference Files
 
-Before starting, review these reference files in this skill's `reference/` directory:
+Before starting, always read:
 
-- **`arch-api-reference.md`** — Arch.make* function signatures, key properties, and code patterns
-- **`architectural-standards.md`** — Standard dimensions, structural rules of thumb, accessibility requirements
+- **`reference/arch-api-reference.md`** — Arch.make* function signatures, key properties, and code patterns
+- **`.claude/context/freecad-arch-guide.md`** — Practical Arch modeling patterns
 
-Also review `.claude/context/freecad-arch-guide.md` for practical Arch modeling patterns.
+Read `reference/architectural-standards.md` for generic/international defaults (room sizes, door widths, stair geometry). Note: values are generic — override with BBR when designing for Sweden (see below).
+
+### Swedish projects (BBR)
+
+Do **not** pre-load all BBR files — they add ~40KB to context unnecessarily. Instead:
+
+1. Read `.claude/context/bbr-reference.md` — it's a one-page index with a quick-reference table
+2. When you reach a design phase where a specific regulation matters, read only that topic file:
+
+| When you need... | Read |
+|-----------------|------|
+| Ceiling heights, room sizes | `.claude/context/arch-swe-room-dimensions-reference.md` |
+| Ramps, door widths, accessibility | `.claude/context/arch-swe-accessibility-reference.md` |
+| Fire classes, building classes (Br/Vk) | `.claude/context/arch-swe-fire-safety-reference.md` |
+| Stairwells (Tr1/Tr2), evacuation | `.claude/context/arch-swe-stairs-ramps-reference.md` |
+| Daylight (dagsljusfaktor), egress | `.claude/context/arch-swe-doors-windows-daylight-reference.md` |
+| Structural safety classes (SK1–SK3) | `.claude/context/arch-swe-structural-reference.md` |
+| Parking (HC spaces) | `.claude/context/arch-swe-parking-reference.md` |
 
 ---
 

@@ -2,6 +2,15 @@
 
 Standard dimensions, accessibility requirements, and structural rules of thumb for architectural design in FreeCAD. All values in millimeters unless noted.
 
+> **Jurisdiction**: These are generic / international defaults (loosely US/IBC-based).
+> **For Swedish projects**, BBR values take precedence. Key differences:
+> - Ceiling heights: BBR 2400mm (bostäder), 2700mm (publika lokaler) — not the 2300mm here
+> - Door clear passage: BBR 760mm interior, 800mm entrance — not ADA 815mm
+> - Ramp gradient: same (1:12), but BBR adds 2m landing + 500mm max rise between landings
+> - Daylight: BBR requires dagsljusfaktor ≥1.0% over half the assessed floor area
+> - Fire: BBR uses Br0–Br3 + EI/REI classes, not the generic hour ratings below
+> Read `.claude/context/bbr-reference.md` for the index, then the relevant topic file.
+
 ---
 
 ## Room Dimensions (Residential)
