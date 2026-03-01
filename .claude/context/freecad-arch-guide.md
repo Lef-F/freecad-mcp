@@ -218,7 +218,7 @@ site.Group = [building]
 ```python
 slab = Arch.makeStructure(length=L, width=W, height=slab_t)
 slab.Label = "Slab_Ground"
-slab.Role = "Slab"
+slab.IfcType = "Slab"
 slab.Placement.Base = FreeCAD.Vector(0, 0, levels["Ground"] - slab_t)
 ```
 
@@ -227,7 +227,7 @@ slab.Placement.Base = FreeCAD.Vector(0, 0, levels["Ground"] - slab_t)
 ```python
 col = Arch.makeStructure(length=300, width=300, height=wall_h)
 col.Label = "Col_GF_01"
-col.Role = "Column"
+col.IfcType = "Column"
 col.Placement.Base = FreeCAD.Vector(4000, 3000, levels["Ground"])
 ```
 
@@ -236,7 +236,7 @@ col.Placement.Base = FreeCAD.Vector(4000, 3000, levels["Ground"])
 ```python
 beam = Arch.makeStructure(length=6000, width=200, height=400)
 beam.Label = "Beam_GF_01"
-beam.Role = "Beam"
+beam.IfcType = "Beam"
 beam.Placement.Base = FreeCAD.Vector(0, 3000, levels["First"] - 400)
 ```
 
@@ -251,21 +251,25 @@ Use `Arch.makeStructure()` as a slab at the roof level.
 ### Pitched roof (from closed wire)
 
 ```python
-# Roof profile wire
+# The wire follows the building wall footprint (not including overhang).
+# The overhang parameter adds the eave projection.
 pts = [
-    FreeCAD.Vector(-500, -500, levels["Roof"]),    # overhang
-    FreeCAD.Vector(L+500, -500, levels["Roof"]),
-    FreeCAD.Vector(L+500, W+500, levels["Roof"]),
-    FreeCAD.Vector(-500, W+500, levels["Roof"]),
+    FreeCAD.Vector(0, 0, levels["Roof"]),
+    FreeCAD.Vector(L, 0, levels["Roof"]),
+    FreeCAD.Vector(L, W, levels["Roof"]),
+    FreeCAD.Vector(0, W, levels["Roof"]),
 ]
 wire = Draft.make_wire(pts, closed=True)
 
-# Gable roof (two pitched sides, two vertical ends)
-roof = Arch.makeRoof(wire, angles=[35, 90, 35, 90])
+# Gable roof (two pitched sides, two vertical gable ends)
+# angles: pitch per edge; 90° = vertical gable end (no pitch)
+# overhang: eave projection in mm (applied by makeRoof, not in wire coords)
+roof = Arch.makeRoof(wire, angles=[35, 90, 35, 90], overhang=[500, 0, 500, 0])
 roof.Label = "Roof"
 ```
 
 **Angle = 90°** means a vertical gable end (no pitch on that edge).
+**overhang** is the horizontal projection of the eave beyond the wire — pass `0` for gable ends.
 
 ---
 
@@ -303,7 +307,7 @@ gf.addObject(stairs)
 | Element | Pattern | Example |
 |---------|---------|---------|
 | Exterior wall | `Wall_{level}_{direction}` | `Wall_GF_South` |
-| Interior partition | `Part_{level}_{room}` | `Part_GF_Kitchen` |
+| Interior partition | `Partition_{level}_{room}` | `Partition_GF_Kitchen` |
 | Window | `Win_{level}_{wall}_{nn}` | `Win_GF_S_01` |
 | Door | `Door_{level}_{name}` | `Door_GF_Entry` |
 | Slab | `Slab_{level}` | `Slab_Ground` |

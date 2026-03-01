@@ -11,9 +11,11 @@ Quick reference for creating architectural objects via `execute_code`. All funct
 ### Walls
 
 ```python
-Arch.makeWall(baseobj=None, length=None, width=None, height=None,
-              align="Center", face=None, name="Wall")
+Arch.makeWall(baseobj=None, height=None, length=None, width=None,
+              align=None, face=None, name=None)
 ```
+
+> Note: `align=None` defaults to `"Center"` in the wall object's enum property.
 
 | Param | Type | Notes |
 |-------|------|-------|
@@ -41,7 +43,7 @@ Arch.makeWindowPreset(windowtype, width, height,
 
 | Param | Type | Notes |
 |-------|------|-------|
-| `windowtype` | str | `"Fixed"`, `"Open 1-pane"`, `"Open 2-pane"`, `"Sash 2-pane"`, `"Sliding 2-pane"`, `"Simple door"`, `"Glass door"`, `"Sliding 4-pane"` |
+| `windowtype` | str | `"Fixed"`, `"Open 1-pane"`, `"Open 2-pane"`, `"Sash 2-pane"`, `"Sliding 2-pane"`, `"Simple door"`, `"Glass door"`, `"Sliding 4-pane"`, `"Awning"`, `"Opening only"` |
 | `width` | float | Total window width (mm) |
 | `height` | float | Total window height (mm) |
 | `h1, h2, h3` | float | Frame height divisions (mm) |
@@ -66,30 +68,32 @@ Arch.makeStructure(baseobj=None, length=None, width=None,
                    height=None, name="Structure")
 ```
 
-Auto-detects role based on dimensions:
-- Height > Length and Height > Width → **Column**
-- Length > Height → **Beam**
-- Otherwise → **Slab** or generic structural element
+Auto-sets `IfcType` based on dimensions (Length vs Height only):
+- `Height > Length` → `IfcType = "Column"`
+- `Length > Height` → `IfcType = "Beam"`
+- No baseobj and no dimensions → `IfcType = "Building Element Proxy"`
 
-Set `structure.Role = "Beam"` / `"Column"` / `"Slab"` explicitly for IFC export.
+**Slab is not auto-detected.** Set `IfcType` explicitly for slabs and to override auto-detection:
+
+```python
+structure.IfcType = "Slab"    # or "Column", "Beam"
+```
 
 ### Floors / Levels
 
 ```python
-Arch.makeFloor(objectslist=None, baseobj=None, name="Floor")
+Arch.makeFloor(objectslist=None, baseobj=None, name=None)
 ```
 
-Creates a Building Storey container. Set `floor.Height` for the storey height (walls inside inherit this if their height is 0). Set `floor.Placement.Base.z` to position the level.
-
-**IFC type**: Automatically set to `"Building Storey"`.
+Creates a `BuildingPart` container with `IfcType = "Building Storey"`. Set `floor.Height` for the storey height (walls inside with `height=0` inherit this). Set `floor.Placement.Base.z` to position the level. Add objects with `floor.addObject(obj)` or `floor.Group = [obj1, obj2, ...]`.
 
 ### Buildings
 
 ```python
-Arch.makeBuilding(objectslist=None, baseobj=None, name="Building")
+Arch.makeBuilding(objectslist=None, baseobj=None, name=None)
 ```
 
-Top-level container for floors. Set `building.Group = [floor1, floor2, ...]`.
+Creates a `BuildingPart` container with `IfcType = "Building"`. Top-level container for floors. Set `building.Group = [floor1, floor2, ...]`.
 
 ### Sites
 
@@ -119,24 +123,26 @@ Arch.makeStairs(baseobj=None, length=None, width=None,
 
 ```python
 Arch.makeRoof(baseobj=None, facenr=0,
-              angles=[45.], run=[], idrel=[0],
-              thickness=[50.], overhang=[100.], name="Roof")
+              angles=[45.], run=[250.],
+              idrel=[-1], thickness=[50.],
+              overhang=[100.], name="Roof")
 ```
 
-Requires a closed wire (Draft Wire or Sketch). Each list parameter corresponds to one segment of the wire.
+Requires a closed wire (Draft Wire or Sketch) following the **wall footprint** at roof level. The `overhang` parameter adds the eave projection beyond the wire. Each list parameter corresponds to one segment of the wire — lists are auto-extended to match segment count.
 
 | Param | Type | Notes |
 |-------|------|-------|
-| `angles` | list[float] | Pitch angle per segment (degrees) |
-| `run` | list[float] | Horizontal projection per segment. Empty = auto-calc. |
-| `thickness` | list[float] | Roof thickness per segment (mm) |
-| `overhang` | list[float] | Overhang per segment (mm) |
+| `angles` | list[float] | Pitch angle per segment (degrees). 90° = vertical gable end. |
+| `run` | list[float] | Horizontal run per segment (mm). Default 250mm. |
+| `idrel` | list[int] | Relative index for ridge calculation. Default -1 (auto). |
+| `thickness` | list[float] | Roof thickness per segment (mm). Default 50mm. |
+| `overhang` | list[float] | Eave overhang per segment (mm). Default 100mm. Use 0 for gable ends. |
 
 ### Other Objects
 
 ```python
 Arch.makeSectionPlane()              # Section cutting plane
-Arch.makeSpace(objectslist=None)     # Room/space volume
+Arch.makeSpace(objects=None)         # Room/space volume (pass a solid or list of face refs)
 Arch.makeMaterial(name="Material")   # Material definition
 Arch.makeMultiMaterial(name="Multi") # Multi-layer material
 Arch.makePipe(baseobj=None, diameter=0, length=0)

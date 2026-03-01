@@ -79,7 +79,7 @@ Levels are the backbone of architectural design. Define them as a Python dict at
 levels = {
     "Foundation":  -200,
     "Ground":         0,
-    "First Floor": 3000,
+    "First":       3000,
     "Roof":        6000,
 }
 floor_to_floor = 3000
@@ -87,7 +87,7 @@ slab_t = 200
 wall_h = floor_to_floor - slab_t  # 2800mm clear
 ```
 
-**Never hardcode a z-coordinate.** Always reference `levels["Ground"]`, `levels["First Floor"]`, etc.
+**Never hardcode a z-coordinate.** Always reference `levels["Ground"]`, `levels["First"]`, etc.
 
 ### Create the BIM hierarchy
 
@@ -110,7 +110,7 @@ ground_floor.Height = floor_to_floor
 first_floor = Arch.makeFloor()
 first_floor.Label = "First Floor"
 first_floor.Height = floor_to_floor
-first_floor.Placement.Base.z = levels["First Floor"]
+first_floor.Placement.Base.z = levels["First"]
 
 # Nest: elements → floor → building → site
 building.Group = [ground_floor, first_floor]
@@ -294,7 +294,7 @@ hole.Width = 1200 + 100
 hole.Height = slab_t + 10
 hole.Placement.Base = FreeCAD.Vector(
     stair_x - 50, stair_y - 50,
-    levels["First Floor"] - 5
+    levels["First"] - 5
 )
 cut = doc.addObject("Part::Cut", "Slab_1F_Cut")
 cut.Base = slab_1f
@@ -320,10 +320,10 @@ building.addObject(roof_slab)  # or top floor
 
 ### Pitched roof
 
-Create a closed wire profile, then use `Arch.makeRoof()`:
+Create a closed wire profile (the building wall footprint at roof level), then use `Arch.makeRoof()`. The `overhang` parameter adds the eave projection — do not pre-bake overhang into the wire coordinates.
 
 ```python
-# Roof profile (closed wire following building perimeter)
+# Wire follows the building wall footprint (no overhang in coordinates)
 pts = [
     FreeCAD.Vector(0, 0, levels["Roof"]),
     FreeCAD.Vector(L, 0, levels["Roof"]),
@@ -332,7 +332,8 @@ pts = [
 ]
 wire = Draft.make_wire(pts, closed=True)
 
-roof = Arch.makeRoof(wire, angles=[35, 35, 35, 35])
+# Hip roof (all four sides pitched)
+roof = Arch.makeRoof(wire, angles=[35, 35, 35, 35], overhang=[500, 500, 500, 500])
 roof.Label = "Roof"
 building.addObject(roof)
 ```
@@ -376,14 +377,21 @@ section.Placement.Rotation = FreeCAD.Rotation(FreeCAD.Vector(0, 0, 1), 90)
 
 ### Dimensional checks
 
-Run a programmatic verification against the brief:
+Create `Arch::Space` objects for rooms and verify areas:
 
 ```python
-# Verify all rooms meet minimum area requirements
+# Create a Space from an enclosing solid or from bounding walls
+space = Arch.makeSpace(objects=room_solid)  # pass a solid or list of (obj, face) tuples
+space.Label = "Space_GF_LivingRoom"
+ground_floor.addObject(space)
+
+doc.recompute()
+
+# Verify all spaces meet minimum area requirements
 for obj in doc.Objects:
     if hasattr(obj, "IfcType") and obj.IfcType == "Space":
-        area = obj.Shape.Area / 1e6  # mm² to m²
-        print(f"{obj.Label}: {area:.1f} m²")
+        area = obj.Shape.Volume / 1e9 / (wall_h / 1000)  # approximate floor area in m²
+        print(f"{obj.Label}: ~{area:.1f} m²")
 ```
 
 > **Checkpoint**: "Here's the building from four views. Does the design match your intent? Any rooms to resize, openings to adjust, or elements to add?"
