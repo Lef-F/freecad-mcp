@@ -335,11 +335,11 @@ class FreeCADRPC:
         else:
             return {"success": False, "error": res}
 
-    def get_objects(self, doc_name):
+    def get_objects(self, doc_name, summary_only=True):
         doc = FreeCAD.getDocument(doc_name)
         if doc:
             try:
-                return {"success": True, "objects": [serialize_object(obj) for obj in doc.Objects]}
+                return {"success": True, "objects": [serialize_object(obj, summary_only=summary_only) for obj in doc.Objects]}
             except Exception as e:
                 return {"success": False, "error": str(e)}
         else:
