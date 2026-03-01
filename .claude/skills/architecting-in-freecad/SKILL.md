@@ -284,7 +284,7 @@ print(f'footprint={n*run:.0f}mm x 1200mm')
 
 ### Slab openings for stairs
 
-If stairs pass through a floor slab, create a slab opening:
+If stairs pass through a floor slab, create a slab opening. This uses `Part::Box` + `Part::Cut` (there is no Arch-native slab opening tool):
 
 ```python
 # Cut the opening in the upper floor slab
