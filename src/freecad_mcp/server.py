@@ -72,17 +72,15 @@ if FreeCAD.Gui.ActiveDocument and FreeCAD.Gui.ActiveDocument.ActiveView:
 
     if view_type in unsupported_views or not hasattr(FreeCAD.Gui.ActiveDocument.ActiveView, 'saveImage'):
         print("Current view does not support screenshots")
-        False
     else:
         print(f"Current view supports screenshots: {view_type}")
-        True
 else:
     print("No active view")
-    False
 """),
             )
 
-            # If the view doesn't support screenshots, return None
+            # Screenshot support is detected via the printed message — if the message contains
+            # "does not support screenshots" or the code failed, skip the screenshot.
             if not result.get(
                 "success", False
             ) or "Current view does not support screenshots" in result.get(

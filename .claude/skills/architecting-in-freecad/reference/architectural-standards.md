@@ -9,7 +9,20 @@ Standard dimensions, accessibility requirements, and structural rules of thumb f
 > - Ramp gradient: same (1:12), but BBR adds 2m landing + 500mm max rise between landings
 > - Daylight: BBR requires dagsljusfaktor ≥1.0% over half the assessed floor area
 > - Fire: BBR uses Br0–Br3 + EI/REI classes, not the generic hour ratings below
-> Read `.claude/context/bbr-reference.md` for the index, then the relevant topic file.
+
+### When to consult BBR files
+
+Start with `.claude/context/bbr-reference.md` (index + quick-ref), then open the relevant topic file:
+
+| Topic in this file | BBR context file |
+|-------------------|-----------------|
+| Room dimensions, ceiling heights | `arch-swe-room-dimensions-reference.md` |
+| Accessibility, ramps, lifts | `arch-swe-accessibility-reference.md` |
+| Doors, windows, daylight (DF%) | `arch-swe-doors-windows-daylight-reference.md` |
+| Fire classes, stairwells, egress | `arch-swe-fire-safety-reference.md` |
+| Stairs geometry, ramps, circulation | `arch-swe-stairs-ramps-reference.md` |
+| Structural loads, safety classes (EKS) | `arch-swe-structural-reference.md` |
+| Parking, site planning | `arch-swe-parking-reference.md` |
 
 ---
 

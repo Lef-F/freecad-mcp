@@ -57,17 +57,14 @@ PBL kunskapsbanken:
 
 ## Doors (Dörrar) — BBR avsnitt 3:14 & 3:146
 
-| BBR ref | Swedish original (summary) | English | Value | Type | Applies to |
-|---------|---------------------------|---------|-------|------|------------|
-| BBR 3:146 | Fri passage inuti bostad (entréplan): minst 0,76 m | Free passage width inside dwelling (entry floor): min 0.76 m | **0,76 m** | Krav | Inside dwellings |
-| BBR 3:146 | Entrédörr till bostad: minst 0,80 m | Entrance door to dwelling: min 0.80 m | **0,80 m** | Krav | Dwelling entrance |
-| BBR 3:143 | Huvudentré till flerbostadshus: minst 0,80 m | Main entrance to apartment building | **0,80 m** | Krav | Flerbostadshus |
-| BBR 3:143 | Övriga tillgängliga dörrar: minst 0,80 m | Other accessible doors | **0,80 m** | Krav | All accessible doors |
-| BBR 3:143 | Automatisk dörröppnare rekommenderas vid tyngre dörrar | Automatic opener recommended for heavy/self-closing doors | — | Allmänt råd | Public entrances |
-| BBR 3:143 | Manöverpanel centrumhöjd 0,80 m från golv | Control panel centre at 0.80 m from floor | **0,80 m** | Allmänt råd | Door controls |
-| BBR 3:143 | Manöverpanel minst 0,70 m (pref. 1,0 m) från hörn/dörrfoder | Control panel min 0.70 m (pref. 1.0 m) from corner | **0,70 m / 1,0 m** | Allmänt råd | Door controls |
-| BBR 3:143 | Korridor i bostad: rekommenderad bredd 1 200 mm | Corridor in dwelling: recommended width 1 200 mm | **1 200 mm** | Allmänt råd | Dwelling corridors |
-| BBR 3:143 | Trösklar bör undvikas; om de finns: så låga och avfasade som möjligt | Thresholds should be avoided; if present: as low and beveled as possible | — | Allmänt råd | All doors |
+> Full door dimensions and detail are in **[arch-swe-doors-windows-daylight-reference.md](arch-swe-doors-windows-daylight-reference.md)**. Accessibility-critical values:
+
+| BBR ref | English | Value | Type |
+|---------|---------|-------|------|
+| BBR 3:146 | Free passage inside dwelling (entry floor) | **0,76 m** | Krav |
+| BBR 3:143 | Main entrance / all accessible doors | **0,80 m** | Krav |
+| BBR 3:143 | Control panel centre height from floor | **0,80 m** | Allmänt råd |
+| BBR 3:143 | Control panel min distance from corner | **0,70 m** (pref. 1,0 m) | Allmänt råd |
 
 ---
 

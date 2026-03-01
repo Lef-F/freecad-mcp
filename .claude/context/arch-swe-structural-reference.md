@@ -21,6 +21,17 @@ PBL kunskapsbanken:
 
 **Rule**: Safety class determines partial factors (γ) for load combinations and material resistances.
 
+### Practical SK selection guide
+
+| Building type | Typical SK by element | Notes |
+|--------------|----------------------|-------|
+| Single-family house (villa) | Floor slabs: **SK2**; Columns/walls (primary): **SK3** | |
+| Multi-storey residential (flerbostadshus) | All floor slabs: **SK2**; All primary stabilizing elements: **SK3** | Stabilizing elements = shear walls, cores, columns |
+| Industrial hall, low occupancy | Ground slab: **SK1**; Roof structure: **SK2** | |
+| Foundations / piles | Follows superstructure SK; often **SK3** | Per EKS Avdelning I |
+
+> All primary stabilizing elements (stommens stabiliserande delar) are always SK3 per EKS Avdelning A.
+
 ---
 
 ## Eurocode Structure with Swedish National Annexes (EKS)
@@ -48,7 +59,11 @@ EKS is organized into Avdelningar (divisions) corresponding to each Eurocode:
 
 | Parameter | Category | Swedish value | Notes |
 |-----------|----------|--------------|-------|
-| Floor live load (lagringslokaler) | Category E1 storage | qk = **5,0 kN/m²**, Qk = **7,0 kN** | From Avdelning C (EN 1991-1-1) |
+| Floor live load — residential | Category A | qk = **1,5 kN/m²**, Qk = **2,0 kN** | Avdelning C (EN 1991-1-1) |
+| Floor live load — office | Category B | qk = **2,5 kN/m²**, Qk = **3,5 kN** | Avdelning C |
+| Floor live load — assembly areas | Category C1–C3 | qk = **3,0–5,0 kN/m²** | Avdelning C; sub-category dependent |
+| Floor live load — storage | Category E1 | qk = **5,0 kN/m²**, Qk = **7,0 kN** | Avdelning C |
+| Roof live load (inaccessible) | Category H | qk = **0,5 kN/m²** | Avdelning C |
 
 ---
 

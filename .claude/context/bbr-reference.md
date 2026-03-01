@@ -6,9 +6,13 @@ Last scraped: 2026-03-01
 
 ## Transition Notice
 
-- **BBR** (Boverkets byggregler, BFS 2011:6, currently BBR 31 / BFS 2024:14) applies during transition.
-- **New rules** effective 1 July 2025 — usable immediately for daylight (BFS 2024:8), parking (BFS 2024:13).
-- **Old BBR** valid for construction with permits/notifications submitted before 1 July 2026.
+| Permit/notification submitted | Applicable rules |
+|------------------------------|-----------------|
+| Before 1 July 2026 | **Old BBR** (BFS 2011:6 / BBR 31) applies — new daylight (BFS 2024:8) and parking (BFS 2024:13) rules may also be used voluntarily |
+| On or after 1 July 2026 | **New rules** (BFS 2024:8, BFS 2024:13, etc.) mandatory |
+
+- **BBR** = Boverkets byggregler, BFS 2011:6, currently BBR 31 / BFS 2024:14
+- If unsure of permit date, assume old rules apply and flag the transition to the user.
 
 ---
 

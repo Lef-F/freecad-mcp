@@ -39,18 +39,13 @@ PBL kunskapsbanken:
 
 ## Ramp Requirements — BBR 3:12 & 3:14
 
-(See accessibility reference for full ramp details)
+> Full ramp details (gradient, width, landings, edge guards, contrast marking) are in **[arch-swe-accessibility-reference.md](arch-swe-accessibility-reference.md)**. Key values for quick reference:
 
-| Parameter | Value | BBR ref | Type |
-|-----------|-------|---------|------|
-| Max gradient (plot/building) | **1:12** (8.3%) | BBR 3:122, 3:142 | Krav |
-| Recommended gradient | **1:20** (5%) | BBR 3:122 | Allmänt råd |
-| Min free width | **1,3 m** | BBR 3:122 | Krav |
-| Landing length | **≥2,0 m** | BBR 3:122 | Krav |
-| Max height between landings | **0,5 m** | BBR 3:122 | Krav |
-| Edge guard | **≥40 mm** | BBR 3:122 | Krav |
-| Contrast marking | **NCS Δ ≥ 0.40** | BBR 3:122 | Krav |
-| Max total height (recommendation) | **1,0 m** | BBR 3:142 | Allmänt råd |
+| Parameter | Value | BBR ref |
+|-----------|-------|---------|
+| Max gradient | **1:12** (8.3%) | BBR 3:122 |
+| Min free width | **1,3 m** | BBR 3:122 |
+| Landing length | **≥2,0 m** | BBR 3:122 |
 
 ---
 
@@ -62,15 +57,22 @@ PBL kunskapsbanken:
 
 ---
 
-## Stair Geometry (General)
+## Stair Geometry (General) — BBR avsnitt 8:232 & 8:2321
 
-> Note: Detailed stair step dimensions (steg, stegdjup, sätthöjd) are specified in BBR avsnitt 8:232 for safety during use. Key values:
+| Parameter | Value | BBR ref | Type |
+|-----------|-------|---------|------|
+| Sätthöjd (riser height) max — bostäder | **180 mm** | BBR 8:232 | Krav |
+| Sätthöjd (riser height) max — other buildings | **200 mm** | BBR 8:232 | Krav |
+| Stegdjup (tread depth) min — bostäder | **220 mm** | BBR 8:232 | Krav |
+| Stegdjup (tread depth) min — other buildings | **200 mm** | BBR 8:232 | Krav |
+| Comfort formula | **2 × sätthöjd + stegdjup = 580–650 mm** | BBR 8:232 | Allmänt råd |
+| Min stair free width — bostäder | **900 mm** | BBR 8:232 | Krav |
+| Min stair free width — public buildings | **1 200 mm** | BBR 8:232 | Krav |
+| Handrail height (ledstång) | **0,90 m** at ramps and stairs | BBR 8:2321 | Krav |
+| Balustrade height (räcke) at openings >0.5 m | **1,10 m** | BBR 8:2322 | Krav |
+| Handrails required | Both sides if stair >500 mm wide | BBR 8:2321 | Krav |
 
-| Parameter | Typical requirement | Type |
-|-----------|---------------------|------|
-| Handrail height (ledstång) | **0,90 m** at ramps, intermediate stairs | Krav |
-| Balustrade height (räcke) | **1,10 m** at openings >0.5 m above floor | Krav |
-| BBR 8:2321 | Handrails on both sides of ramps and stairs >500 mm wide | Krav |
+> Note: Values from BBR training data — verify against current BBR avsnitt 8:232 for permit-stage calculations.
 
 ---
 

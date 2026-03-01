@@ -64,7 +64,6 @@ Most mutation tools return a base64 PNG screenshot. The addon checks view compat
 
 - **`FreeCAD.Color` missing in FreeCAD 1.0.2**: The `App.Color` class doesn't exist in older releases. `serialize.py` guards this with `hasattr(App, "Color")` to avoid `AttributeError` crashes in `get_objects`/`get_object`.
 - **Screenshot size overflow**: On high-DPI displays, default viewport screenshots can exceed 300KB. Always pass explicit `width`/`height` to `get_view`.
-- **`execute_code` screenshot overhead**: By default `execute_code` captures a screenshot after every call. Pass `capture_screenshot=False` for diagnostic/read-only queries to avoid the overhead.
 - **Parts library dependency**: `get_parts_list` and `insert_part_from_library` require the optional [FreeCAD Parts Library addon](https://github.com/FreeCAD/FreeCAD-library). They return empty/error responses if it's not installed.
 - **Serialization fragility**: Unhandled FreeCAD types in `serialize_value()` fall back to `str()`. If `serialize_object()` itself raises, `get_objects`/`get_object` return `{"success": false, "error": ...}` instead of crashing.
 - **`InitGui.py` class body scoping**: FreeCAD loads `InitGui.py` via `exec()` without an explicit globals dict, so module-level imports are NOT visible inside class bodies (only string/number literals are safe there). Always set computed attributes like `Icon` inside `Initialize()` using `self.__class__.Icon = ...`. See `.claude/context/freecad-patterns.md` for the full explanation and source reference.
