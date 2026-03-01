@@ -86,6 +86,17 @@ Before touching FreeCAD, establish the architectural program.
 
 ---
 
+## Design Knowledge Store
+
+Before any FreeCAD work, check `.designs/<doc-name>/`:
+
+- **Exists** → Read `README.md`, `objects.md`, `tasks.md` to restore prior context, decisions, and known object structure.
+- **Doesn't exist** → Create it after Phase 1. Capture the agreed design brief in `README.md`, an initial object catalog in `objects.md`, and the build plan as Active tasks in `tasks.md`. See `.claude/context/designs-store.md` for templates.
+
+Update `objects.md` as objects are created during the session. At session end, move completed tasks to Done, append decisions/discoveries to `README.md`, and save any useful scripts to `scripts/`.
+
+---
+
 ## Phase 2 — Levels & Building Setup
 
 ### Define levels first
@@ -447,6 +458,13 @@ for name in ["Wall_GF_South", "Wall_GF_East"]:
 2. Object inventory with areas/volumes if relevant
 3. List of deferred items (details not modeled, services not routed)
 4. Ask: "Save and export, or keep refining?"
+
+### Update `.designs/<doc-name>/`
+
+- **`objects.md`** — reflect all objects created, renamed, or removed this session
+- **`tasks.md`** — move completed tasks to Done (date-stamped); add deferred items as Active
+- **`README.md`** — append design decisions (structural system, level heights, materials chosen) and open questions
+- **`scripts/`** — save reusable `execute_code` snippets (e.g., batch wall creation, level verification)
 
 ---
 

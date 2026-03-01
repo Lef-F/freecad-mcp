@@ -194,6 +194,15 @@ Note: The addon code (`addon/`) runs inside FreeCAD's embedded Python and import
 ### Pre-commit Hooks
 Git pre-commit hooks are configured. Ensure your venv is activated before committing so hooks can find the required tools.
 
+## Design Knowledge Store
+
+Any session that creates or modifies a FreeCAD design **must** maintain `.designs/<document-name>/`.
+This folder is gitignored (local only) but the convention is defined in `.claude/context/designs-store.md` and shared with all Claude instances through this file.
+
+**Mandatory**: At the start of every design session, check for `.designs/<doc-name>/` and either read it to restore context or create it. At the end, update `objects.md`, `tasks.md`, and `README.md` with what changed.
+
+See `.claude/context/designs-store.md` for the full convention: file structure, templates, and session lifecycle rules.
+
 ## Conventions
 
 ### Commits

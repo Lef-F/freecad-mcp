@@ -100,6 +100,15 @@ If working in an existing document, call `list_documents` to confirm it's open, 
 
 > **Checkpoint**: Show the user what exists. Confirm the starting point before adding anything.
 
+### Design knowledge store
+
+Check whether `.designs/<doc-name>/` exists (use `Glob` or `Read`).
+
+- **Exists** → Read `README.md`, `objects.md`, `tasks.md` to restore context before touching FreeCAD.
+- **Doesn't exist** → Create it now: `README.md` (project overview + status), `objects.md` (initial object catalog from `get_objects`), `tasks.md` (active tasks from the user's stated intent). See `.claude/context/designs-store.md` for templates.
+
+Keep these files open and edit them incrementally throughout the session — do not batch all updates to the end.
+
 ---
 
 ## Phase 3 — Iterative Build Loop
@@ -184,6 +193,15 @@ When the modeling session reaches a natural end:
 2. List all objects created in this session
 3. Note any deferred items (details not yet modeled, openings not cut, etc.)
 4. Ask: "Would you like to save the document, or keep working?"
+
+### Update `.designs/<doc-name>/`
+
+Before closing the session:
+
+- **`objects.md`** — reflect any objects added, renamed, or removed during this session
+- **`tasks.md`** — move completed tasks to Done (with today's date); add new deferred items as Active
+- **`README.md`** — append any design decisions made or discoveries found under the relevant sections
+- **`scripts/`** — save any `execute_code` snippet that proved reusable
 
 ---
 
