@@ -25,10 +25,6 @@ addon/FreeCADMCP/
     rpc_server.py          # XML-RPC server, GUI task queue, FreeCADRPC handler, settings, IP filtering
     serialize.py           # FreeCAD objects → JSON-serializable dicts
     parts_library.py       # Parts library search and insertion
-
-examples/
-  adk/                    # Google ADK integration example
-  langchain/              # LangChain ReAct agent example
 ```
 
 ## Key Design Patterns

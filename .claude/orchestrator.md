@@ -14,7 +14,6 @@ Determine which area(s) the user's request falls into:
 | `parts-library` | Parts library search, insertion, caching | `addon/FreeCADMCP/rpc_server/parts_library.py` |
 | `addon-ui` | Workbench registration, menu commands, toolbar, settings UI | `addon/FreeCADMCP/InitGui.py`, `addon/FreeCADMCP/rpc_server/rpc_server.py` (GUI command classes) |
 | `packaging` | pyproject.toml, versioning, PyPI distribution, entry points | `pyproject.toml` |
-| `examples` | ADK / LangChain integration examples | `examples/` |
 | `remote-access` | IP filtering, host validation, remote connection toggle | `addon/FreeCADMCP/rpc_server/rpc_server.py`, `src/freecad_mcp/server.py` |
 | `testing-compatibility` | Version-specific bugs, serialization issues, known limitations | `.claude/context/known-issues.md`, `addon/FreeCADMCP/rpc_server/serialize.py` |
 | `freecad-modeling` | Collaborative CAD modeling sessions — building geometry, iterating with screenshots, human checkpoints | Use skill `modeling-in-freecad`; read `.claude/context/freecad-modeling-guide.md` |
