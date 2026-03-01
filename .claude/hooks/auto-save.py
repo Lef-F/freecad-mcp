@@ -14,20 +14,16 @@ try:
         "doc = FreeCAD.ActiveDocument\n"
         "if doc and doc.FileName:\n"
         "    doc.save()\n"
+        "    FreeCADGui.getDocument(doc.Name).Modified = False\n"
         '    print("saved:", doc.Label)\n'
         "else:\n"
-        '    print("skipped: no doc or unsaved doc")'
+        '    print("skipped")'
     )
     output = result.get("message", "")
-    # Extract the print output from the RPC response
     if "saved:" in output:
         label = output.split("saved:", 1)[1].strip()
         print(f"Auto-saved: {label}")
-    elif "skipped:" in output:
-        pass  # New/unsaved doc, nothing to do
-    elif not result.get("success"):
-        print(f"Auto-save failed: {result.get('error', 'unknown')}", file=sys.stderr)
 except ConnectionRefusedError:
-    pass  # FreeCAD not running — tool would have failed too, so this is a no-op
+    pass  # FreeCAD not running
 except Exception as e:
     print(f"Auto-save hook error: {e}", file=sys.stderr)
