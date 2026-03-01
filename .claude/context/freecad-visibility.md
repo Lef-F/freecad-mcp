@@ -312,6 +312,8 @@ doc.recompute()
 | Tip can be None | If a Body has no solid features yet | Check `body.Tip` before accessing `.Name` |
 | File restore does NOT cascade visibility | On load, each object's saved Visibility is used — parent's state does not override | No action needed (intended behavior) |
 | `User1` flag blocks cascade | Programmatic visibility changes marked internally as temporary | Rare in practice; only affects FreeCAD-internal operations |
+| **Selected objects appear light blue** | FreeCAD highlights selected objects with a blue overlay in the 3D viewport. Screenshots capture this highlight, making it look like ShapeColor is wrong | Call `FreeCADGui.Selection.clearSelection()` before screenshots, or recognize blue = selected (color is fine underneath) |
+| `Part.fuse()` crashes on complex lofts | Fusing many complex lofted B-rep shapes can freeze or crash FreeCAD (OCC kernel) | Use `Part.makeCompound()` for display grouping, or individual `Part::Feature` objects in a group |
 
 ---
 

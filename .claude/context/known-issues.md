@@ -89,6 +89,24 @@ On **Windows**, check `%LOCALAPPDATA%\Programs\FreeCAD\bin\python.exe --version`
 | Parts Library addon | Optional | Optional |
 | Embedded Python | 3.11.13 | TBD |
 
+## Visual / UI Gotchas
+
+### Selected Objects Appear Light Blue in Screenshots
+- **Symptom**: An object appears light blue in a screenshot even though `ShapeColor` is set correctly
+- **Root cause**: FreeCAD highlights selected objects with a light blue overlay. When taking screenshots via `get_view`, `analyze_view`, or `execute_code`, the last-created or focused object is often still selected
+- **Fix**: Call `FreeCADGui.Selection.clearSelection()` before taking screenshots if you need to verify true colors. Or simply recognize that light blue = selection highlight, not a color problem
+- **Rule of thumb**: If only ONE object is blue and the rest show correct colors, it's just selected — the `ShapeColor` is fine
+
+### `Part.fuse()` Can Freeze/Crash FreeCAD on Complex Shapes
+- **Symptom**: FreeCAD becomes unresponsive or crashes when fusing many complex lofted shapes (e.g., 18+ lofted planks)
+- **Root cause**: Boolean `fuse` on complex B-rep shapes is computationally expensive and can hit OCC kernel edge cases
+- **Workaround**: Use `Part.makeCompound()` for display-only grouping (fast, no boolean), or create individual `Part::Feature` objects in a group. Reserve `fuse` for when you actually need a single merged solid (e.g., for boolean cuts)
+
+### FreeCAD `exec()` Only Handles ASCII in Python Code Strings
+- **Symptom**: `exec(open(...).read())` or `execute_code` fails with `'ascii' codec can't decode byte 0xc2`
+- **Root cause**: FreeCAD's embedded Python `exec()` uses ASCII encoding for code strings. Unicode characters (degree signs, em-dashes, special math symbols) cause decode errors.
+- **Rule**: All Python code executed inside FreeCAD (scripts, `execute_code` calls) must be **ASCII-only**. Use ASCII alternatives: `~` not `≈`, `deg` not `°`, `--` not `—`, `->` not `→`.
+
 ## Serialization Safety Rules
 
 1. `serialize_value()` must never raise — unhandled types fall back to `str(value)`
