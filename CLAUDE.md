@@ -64,7 +64,6 @@ Most mutation tools return a base64 PNG screenshot. The addon checks view compat
 
 - **`FreeCAD.Color` missing in FreeCAD 1.0.2**: The `App.Color` class doesn't exist in older releases. `serialize.py` guards this with `hasattr(App, "Color")` to avoid `AttributeError` crashes in `get_objects`/`get_object`.
 - **Screenshot size overflow**: On high-DPI displays, default viewport screenshots can exceed 300KB. Always pass explicit `width`/`height` to `get_view`.
-- **`execute_code` always returns a screenshot**: Even for diagnostic/read-only queries, `execute_code` captures and returns a screenshot. Use `--only-text-feedback` or ignore the image to save tokens.
 - **Parts library dependency**: `get_parts_list` and `insert_part_from_library` require the optional [FreeCAD Parts Library addon](https://github.com/FreeCAD/FreeCAD-library). They return empty/error responses if it's not installed.
 - **Serialization fragility**: Unhandled FreeCAD types in `serialize_value()` fall back to `str()`. If `serialize_object()` itself raises, `get_objects`/`get_object` return `{"success": false, "error": ...}` instead of crashing.
 - **`InitGui.py` class body scoping**: FreeCAD loads `InitGui.py` via `exec()` without an explicit globals dict, so module-level imports are NOT visible inside class bodies (only string/number literals are safe there). Always set computed attributes like `Icon` inside `Initialize()` using `self.__class__.Icon = ...`. See `.claude/context/freecad-patterns.md` for the full explanation and source reference.
@@ -77,15 +76,40 @@ Most mutation tools return a base64 PNG screenshot. The addon checks view compat
 | `create_object` | Create Part::, Draft::, PartDesign::, Fem:: objects with properties | Returns screenshot |
 | `edit_object` | Modify existing object properties | Returns screenshot |
 | `delete_object` | Remove object from document | Returns screenshot |
-| `execute_code` | Run arbitrary Python in FreeCAD context | Always returns screenshot |
+| `execute_code` | Run arbitrary Python in FreeCAD context | `capture_screenshot=False` to skip screenshot on read-only queries |
 | `get_view` | Capture screenshot (Isometric/Front/Top/Right/Back/Left/Bottom/Dimetric/Trimetric) | Pass explicit dimensions to control size |
-| `get_objects` | List all objects in a document (serialized) | Returns screenshot; affected by serialization bugs |
-| `get_object` | Get single object details | Returns screenshot; affected by serialization bugs |
+| `get_objects` | List all objects — compact summary by default (Name/Label/TypeId/Placement/Shape) | Pass `detailed=True` for full properties; prefer `execute_code` for targeted reads on large docs |
+| `get_object` | Full properties for a single object | Use for discovery when you don't know property names; prefer `execute_code` once you do |
 | `insert_part_from_library` | Load part from FreeCAD parts library | Requires Parts Library addon |
 | `get_parts_list` | List available .FCStd files in parts library | Requires Parts Library addon |
 | `list_documents` | List open document names | No screenshot, read-only |
 
 There is also a prompt `asset_creation_strategy` that guides LLMs through proper CAD creation workflows.
+
+### Querying strategy (tiered)
+
+Use the lowest-cost tool that answers the question:
+
+| Goal | Tool |
+|------|------|
+| What objects exist in the document? | `get_objects` (summary, default) |
+| What properties does an unfamiliar object have? | `get_object` (full detail, one object) |
+| Targeted read of known properties / cross-object queries / computed values | `execute_code(capture_screenshot=False)` |
+
+`execute_code` is strictly better for surgical reads once you know the property name:
+```python
+# Returns one line instead of 40 serialized properties
+doc = FreeCAD.getDocument("MyDoc")
+w = doc.getObject("WallSouth")
+print(f"height={w.Height} width={w.Width}")
+```
+
+For cross-object queries:
+```python
+walls = [o for o in doc.Objects if o.TypeId == "Arch::Wall"]
+for w in walls:
+    print(f"{w.Label}: h={w.Height} w={w.Width}")
+```
 
 ## Development Setup
 

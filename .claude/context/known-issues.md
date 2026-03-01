@@ -25,9 +25,14 @@ Reference for known bugs, version-specific issues, and workarounds.
 - **Symptom**: Screenshots >300KB on high-DPI (Retina) displays when `width`/`height` are omitted
 - **Workaround**: Pass explicit small dimensions (200-400px) to `get_view`; use `--only-text-feedback` to suppress all screenshots
 
-### `execute_code` Always Returns Screenshot
-- **Symptom**: Even diagnostic/read-only `execute_code` calls return a base64 screenshot, consuming tokens
-- **Workaround**: Use `--only-text-feedback` flag, or accept the screenshot overhead
+### `execute_code` Screenshot on Diagnostic Calls
+- **Status**: Fixed — `execute_code` now accepts `capture_screenshot=False` to skip the screenshot
+- **Workaround (before fix)**: Use `--only-text-feedback` flag
+
+### MCP/Addon Version Mismatch — `summary_only` Parameter
+- **Symptom**: If MCP server is 0.1.17+ but FreeCAD addon is older (pre-0.1.17), calling `get_objects` will fail with `TypeError: get_objects() takes 2 positional arguments but 3 were given` because the old addon doesn't accept the `summary_only` positional arg
+- **Fix**: Restart FreeCAD after deploying the updated addon to `Mod/FreeCADMCP/`
+- **Detection**: The error appears as `"Error: ..."` in the MCP tool response, not a connection failure
 
 ### Parts Library Dependency
 - **Affected tools**: `get_parts_list`, `insert_part_from_library`

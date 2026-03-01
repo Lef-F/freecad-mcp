@@ -72,17 +72,15 @@ if FreeCAD.Gui.ActiveDocument and FreeCAD.Gui.ActiveDocument.ActiveView:
 
     if view_type in unsupported_views or not hasattr(FreeCAD.Gui.ActiveDocument.ActiveView, 'saveImage'):
         print("Current view does not support screenshots")
-        False
     else:
         print(f"Current view supports screenshots: {view_type}")
-        True
 else:
     print("No active view")
-    False
 """),
             )
 
-            # If the view doesn't support screenshots, return None
+            # Screenshot support is detected via the printed message — if the message contains
+            # "does not support screenshots" or the code failed, skip the screenshot.
             if not result.get(
                 "success", False
             ) or "Current view does not support screenshots" in result.get(
@@ -105,8 +103,8 @@ else:
             logger.error(f"Error getting screenshot: {e}")
             return None
 
-    def get_objects(self, doc_name: str) -> dict[str, Any]:
-        return cast(dict[str, Any], self.server.get_objects(doc_name))
+    def get_objects(self, doc_name: str, summary_only: bool = True) -> dict[str, Any]:
+        return cast(dict[str, Any], self.server.get_objects(doc_name, summary_only))
 
     def get_object(self, doc_name: str, obj_name: str) -> dict[str, Any]:
         return cast(dict[str, Any], self.server.get_object(doc_name, obj_name))
@@ -461,20 +459,28 @@ def delete_object(
 
 
 @mcp.tool()
-def execute_code(ctx: Context, code: str) -> list[TextContent | ImageContent]:
+def execute_code(
+    ctx: Context,
+    code: str,
+    capture_screenshot: bool = True,
+) -> list[TextContent | ImageContent]:
     """Execute arbitrary Python code in FreeCAD.
 
     Args:
         code: The Python code to execute.
+        capture_screenshot: Whether to capture and return a screenshot after execution.
+            Set to False for diagnostic/read-only queries to save tokens. Defaults to True.
 
     Returns:
-        A message indicating the success or failure of the code execution, the output of the code execution, and a screenshot of the object.
+        A message indicating the success or failure of the code execution, the output of the code execution, and optionally a screenshot.
     """
     freecad = get_freecad_connection()
     try:
         res = freecad.execute_code(code)
         screenshot = (
-            freecad.get_active_screenshot() if not _only_text_feedback else None
+            freecad.get_active_screenshot()
+            if (capture_screenshot and not _only_text_feedback)
+            else None
         )
 
         if res["success"]:
@@ -597,19 +603,29 @@ def insert_part_from_library(
 
 
 @mcp.tool()
-def get_objects(ctx: Context, doc_name: str) -> list[TextContent | ImageContent]:
+def get_objects(
+    ctx: Context,
+    doc_name: str,
+    detailed: bool = False,
+) -> list[TextContent | ImageContent]:
     """Get all objects in a document.
     You can use this tool to get the objects in a document to see what you can check or edit.
 
+    By default returns a compact summary (Name, Label, TypeId, Placement, Shape) for each
+    object. Pass detailed=True to include all properties — only use this when you need to
+    inspect specific property values across many objects, as it is significantly larger.
+    For full details on a single object, prefer get_object() instead.
+
     Args:
         doc_name: The name of the document to get the objects from.
+        detailed: When True, include all object properties. Defaults to False (summary only).
 
     Returns:
         A list of objects in the document and a screenshot of the document.
     """
     freecad = get_freecad_connection()
     try:
-        result = freecad.get_objects(doc_name)
+        result = freecad.get_objects(doc_name, summary_only=not detailed)
         if not result.get("success", False):
             return [
                 TextContent(

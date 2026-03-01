@@ -132,7 +132,12 @@ Check:
 - Do proportions look correct?
 - Is anything floating, misaligned, or missing?
 
-If something looks wrong, diagnose before asking the user. Try `get_objects` or a targeted `execute_code` query to inspect property values. Fix silently if the cause is clear.
+If something looks wrong, diagnose before asking the user using the tiered query pattern:
+1. `get_objects` — confirm the object exists and its TypeId/Placement
+2. `get_object` — inspect full properties if you don't know the property name yet
+3. `execute_code(capture_screenshot=False)` — targeted read once you know what to check (e.g. `print(doc.getObject("WallSouth").Height)`)
+
+Fix silently if the cause is clear.
 
 ### 3d. Human verification checkpoint
 

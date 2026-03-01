@@ -18,6 +18,7 @@ Determine which area(s) the user's request falls into:
 | `remote-access` | IP filtering, host validation, remote connection toggle | `addon/FreeCADMCP/rpc_server/rpc_server.py`, `src/freecad_mcp/server.py` |
 | `testing-compatibility` | Version-specific bugs, serialization issues, known limitations | `.claude/context/known-issues.md`, `addon/FreeCADMCP/rpc_server/serialize.py` |
 | `freecad-modeling` | Collaborative CAD modeling sessions — building geometry, iterating with screenshots, human checkpoints | Use skill `modeling-in-freecad`; read `.claude/context/freecad-modeling-guide.md` |
+| `freecad-architecture` | Architectural design — buildings, walls, windows, doors, roofs, stairs, BIM hierarchy, IFC | Use skill `architecting-in-freecad`; read `.claude/context/freecad-arch-guide.md` |
 
 ## Step 2: Load context
 
@@ -30,6 +31,7 @@ Based on the classified area(s), load the relevant context files:
 - `testing-compatibility` or `serialization` → Read `.claude/context/known-issues.md`
 - `packaging` or release work → Read skill `preparing-release`
 - `freecad-modeling` → Read `.claude/context/freecad-modeling-guide.md`, use skill `modeling-in-freecad`
+- `freecad-architecture` → Read `.claude/context/freecad-arch-guide.md`, use skill `architecting-in-freecad`; also read `freecad-modeling-guide.md` for base patterns
 
 ## Step 3: Understand the two-component boundary
 
