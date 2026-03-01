@@ -24,6 +24,11 @@ from .serialize import serialize_object
 rpc_server_thread = None
 rpc_server_instance = None
 
+# Screenshot defaults and limits
+_SCREENSHOT_DEFAULT_WIDTH = 400
+_SCREENSHOT_DEFAULT_HEIGHT = 300
+_SCREENSHOT_MAX_DIM = 1600
+
 
 # --- Settings persistence ---
 
@@ -375,9 +380,9 @@ class FreeCADRPC:
     def get_parts_list(self):
         return get_parts_list()
 
-    def get_active_screenshot(self, view_name: str = "Isometric", width: int | None = None, height: int | None = None, focus_object: str | None = None) -> str | None:
+    def get_active_screenshot(self, view_name: str = "Isometric", width: int | None = None, height: int | None = None, focus_object: str | None = None, background_color: str = "white") -> str | None:
         """Get a screenshot of the active view.
-        
+
         Returns a base64-encoded string of the screenshot or None if a screenshot
         cannot be captured (e.g., when in TechDraw or Spreadsheet view).
         """
@@ -409,10 +414,10 @@ class FreeCADRPC:
             return None
 
         # If view supports screenshots, proceed with capture
-        fd, tmp_path = tempfile.mkstemp(suffix=".png")
+        fd, tmp_path = tempfile.mkstemp(suffix=".webp")
         os.close(fd)
         rpc_request_queue.put(
-            lambda: self._save_active_screenshot(tmp_path, view_name, width, height, focus_object)
+            lambda: self._save_active_screenshot(tmp_path, view_name, width, height, focus_object, background_color)
         )
         try:
             res = rpc_response_queue.get(timeout=30)
@@ -569,7 +574,7 @@ class FreeCADRPC:
         except Exception as e:
             return str(e)
 
-    def _save_active_screenshot(self, save_path: str, view_name: str = "Isometric", width: int | None = None, height: int | None = None, focus_object: str | None = None):
+    def _save_active_screenshot(self, save_path: str, view_name: str = "Isometric", width: int | None = None, height: int | None = None, focus_object: str | None = None, background_color: str = "white"):
         try:
             view = FreeCADGui.ActiveDocument.ActiveView
             # Check if the view supports screenshots
@@ -609,10 +614,9 @@ class FreeCADRPC:
                     view.fitAll()
             else:
                 view.fitAll()
-            if width is not None and height is not None:
-                view.saveImage(save_path, width, height)
-            else:
-                view.saveImage(save_path)
+            actual_width = min(width if width is not None else _SCREENSHOT_DEFAULT_WIDTH, _SCREENSHOT_MAX_DIM)
+            actual_height = min(height if height is not None else _SCREENSHOT_DEFAULT_HEIGHT, _SCREENSHOT_MAX_DIM)
+            view.saveImage(save_path, actual_width, actual_height, background_color)
             return True
         except Exception as e:
             return str(e)

@@ -83,6 +83,8 @@ Most mutation tools return a base64 PNG screenshot. The addon checks view compat
 | `insert_part_from_library` | Load part from FreeCAD parts library | Requires Parts Library addon |
 | `get_parts_list` | List available .FCStd files in parts library | Requires Parts Library addon |
 | `list_documents` | List open document names | No screenshot, read-only |
+| `snapshot_view` | Store a "before" screenshot + Gemini pre-analysis for before/after comparison | Gemini-enhanced if CLI available; graceful fallback otherwise |
+| `analyze_view` | Capture screenshot + Gemini visual analysis (recommended for verification) | Gemini-enhanced if CLI available; returns screenshot only otherwise |
 
 There is also a prompt `asset_creation_strategy` that guides LLMs through proper CAD creation workflows.
 

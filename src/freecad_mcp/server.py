@@ -1,5 +1,11 @@
+import base64
 import json
 import logging
+import os
+import shutil
+import subprocess
+import tempfile
+import uuid
 import xmlrpc.client
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Dict, Any, Literal, cast
@@ -16,6 +22,13 @@ logger = logging.getLogger("FreeCADMCPserver")
 
 _only_text_feedback = False
 _rpc_host = "localhost"
+
+# Snapshots for before/after: {view_name: (screenshot_b64, gemini_analysis_text)}
+_snapshots: dict[str, tuple[str, str]] = {}
+
+_session_dir: str | None = None
+_screenshot_count: int = 0
+_detected_client_name: str | None = None
 
 
 class FreeCADConnection:
@@ -55,6 +68,7 @@ class FreeCADConnection:
         width: int | None = None,
         height: int | None = None,
         focus_object: str | None = None,
+        background_color: str = "white",
     ) -> str | None:
         try:
             # Check if we're in a view that supports screenshots
@@ -95,7 +109,7 @@ else:
             return cast(
                 str | None,
                 self.server.get_active_screenshot(
-                    view_name, width, height, focus_object
+                    view_name, width, height, focus_object, background_color
                 ),
             )
         except Exception as e:
@@ -131,10 +145,14 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
         yield {}
     finally:
         # Clean up the global connection on shutdown
-        global _freecad_connection
+        global _freecad_connection, _session_dir
         if _freecad_connection:
             logger.info("Disconnecting from FreeCAD on shutdown")
             _freecad_connection = None
+        if _session_dir and os.path.isdir(_session_dir):
+            shutil.rmtree(_session_dir, ignore_errors=True)
+            logger.info(f"Cleaned up screenshot session dir: {_session_dir}")
+            _session_dir = None
         logger.info("FreeCADMCP server shut down")
 
 
@@ -162,16 +180,66 @@ def get_freecad_connection() -> FreeCADConnection:
     return _freecad_connection
 
 
+def _is_cli_client(ctx: Context) -> bool:
+    """Return True if the connected client is Claude Code CLI.
+
+    Claude Code CLI sends clientInfo.name containing "code" (e.g. "claude-code").
+    Claude Desktop sends "claude-desktop" or similar.
+    Falls back to False (Desktop behaviour) for unknown clients.
+    """
+    global _detected_client_name
+    if _detected_client_name is None:
+        try:
+            cp = ctx.request_context.session.client_params
+            _detected_client_name = (
+                cp.clientInfo.name if (cp and cp.clientInfo) else "unknown"
+            )
+        except Exception as e:
+            _detected_client_name = "unknown"
+            logger.debug(f"Could not detect MCP client type: {e}")
+        logger.info(f"MCP client detected: {_detected_client_name!r}")
+    return "code" in _detected_client_name.lower()
+
+
+def _save_screenshot_file(screenshot_b64: str) -> str:
+    """Decode and save a base64 screenshot to a temp file. Returns the file path.
+
+    Files are written to a per-session temp directory and cleaned up on server shutdown.
+    This allows Claude Code CLI to load the image via its Read tool.
+    """
+    global _session_dir, _screenshot_count
+    if _session_dir is None:
+        _session_dir = tempfile.mkdtemp(prefix="freecad_mcp_")
+    _screenshot_count += 1
+    path = os.path.join(_session_dir, f"screenshot_{_screenshot_count:04d}.webp")
+    with open(path, "wb") as f:
+        f.write(base64.b64decode(screenshot_b64))
+    return path
+
+
 # Helper function to safely add screenshot to response
 def add_screenshot_if_available(
-    response: list[TextContent], screenshot: str | None
+    response: list[TextContent],
+    screenshot: str | None,
+    ctx: Context,
+    screenshot_attempted: bool = True,
 ) -> list[TextContent | ImageContent]:
-    """Safely add screenshot to response only if it's available"""
+    """Safely add screenshot to response only if it's available.
+
+    CLI clients receive a file path (no base64); Desktop clients receive ImageContent.
+    When screenshot_attempted=False (caller opted out), no "unavailable" note is shown.
+    """
     result: list[TextContent | ImageContent] = list(response)
     if screenshot is not None and not _only_text_feedback:
-        result.append(ImageContent(type="image", data=screenshot, mimeType="image/png"))
-    elif not _only_text_feedback:
-        # Add an informative message that will be seen by the AI model and user
+        if _is_cli_client(ctx):
+            path = _save_screenshot_file(screenshot)
+            result.append(TextContent(type="text", text=f"Screenshot: {path}"))
+        else:
+            result.append(
+                ImageContent(type="image", data=screenshot, mimeType="image/webp")
+            )
+    elif screenshot_attempted and not _only_text_feedback:
+        # Screenshot was requested but the view doesn't support it (e.g. TechDraw, Spreadsheet)
         result.append(
             TextContent(
                 type="text",
@@ -180,6 +248,42 @@ def add_screenshot_if_available(
             )
         )
     return result
+
+
+def _call_gemini(
+    image_b64: str, question: str, before_analysis: str | None = None
+) -> str | None:
+    """Send a screenshot to Gemini CLI. Returns analysis text, or None if CLI unavailable."""
+    gemini_path = shutil.which("gemini")
+    if not gemini_path:
+        return None
+
+    img_path = f"/tmp/freecad_mcp_{uuid.uuid4().hex[:8]}.webp"
+    try:
+        with open(img_path, "wb") as f:
+            f.write(base64.b64decode(image_b64))
+
+        if before_analysis:
+            prompt = (
+                f"BEFORE state description: {before_analysis}\n\n"
+                f"Now for the AFTER state — {question} @{img_path}"
+            )
+        else:
+            prompt = f"{question} @{img_path}"
+
+        result = subprocess.run(
+            [gemini_path, "--include-directories", "/tmp", "-p", prompt, "-o", "text"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        return result.stdout.strip() if result.returncode == 0 else None
+    except Exception as e:
+        logger.warning(f"Gemini CLI call failed: {e}")
+        return None
+    finally:
+        if os.path.exists(img_path):
+            os.unlink(img_path)
 
 
 @mcp.tool()
@@ -229,6 +333,7 @@ def create_object(
     obj_name: str,
     analysis_name: str | None = None,
     obj_properties: dict[str, Any] | None = None,
+    capture_screenshot: bool = True,
 ) -> list[TextContent | ImageContent]:
     """Create a new object in FreeCAD.
     Object type is starts with "Part::" or "Draft::" or "PartDesign::" or "Fem::".
@@ -355,7 +460,9 @@ def create_object(
         }
         res = freecad.create_object(doc_name, obj_data)
         screenshot = (
-            freecad.get_active_screenshot() if not _only_text_feedback else None
+            freecad.get_active_screenshot()
+            if (capture_screenshot and not _only_text_feedback)
+            else None
         )
 
         if res["success"]:
@@ -365,14 +472,14 @@ def create_object(
                     text=f"Object '{res['object_name']}' created successfully",
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot)
+            return add_screenshot_if_available(response, screenshot, ctx)
         else:
             response = [
                 TextContent(
                     type="text", text=f"Failed to create object: {res['error']}"
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot)
+            return add_screenshot_if_available(response, screenshot, ctx)
     except Exception as e:
         logger.error(f"Failed to create object: {str(e)}")
         return [TextContent(type="text", text=f"Failed to create object: {str(e)}")]
@@ -380,7 +487,11 @@ def create_object(
 
 @mcp.tool()
 def edit_object(
-    ctx: Context, doc_name: str, obj_name: str, obj_properties: dict[str, Any]
+    ctx: Context,
+    doc_name: str,
+    obj_name: str,
+    obj_properties: dict[str, Any],
+    capture_screenshot: bool = True,
 ) -> list[TextContent | ImageContent]:
     """Edit an object in FreeCAD.
     This tool is used when the `create_object` tool cannot handle the object creation.
@@ -397,7 +508,9 @@ def edit_object(
     try:
         res = freecad.edit_object(doc_name, obj_name, {"Properties": obj_properties})
         screenshot = (
-            freecad.get_active_screenshot() if not _only_text_feedback else None
+            freecad.get_active_screenshot()
+            if (capture_screenshot and not _only_text_feedback)
+            else None
         )
 
         if res["success"]:
@@ -407,12 +520,12 @@ def edit_object(
                     text=f"Object '{res['object_name']}' edited successfully",
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot)
+            return add_screenshot_if_available(response, screenshot, ctx)
         else:
             response = [
                 TextContent(type="text", text=f"Failed to edit object: {res['error']}"),
             ]
-            return add_screenshot_if_available(response, screenshot)
+            return add_screenshot_if_available(response, screenshot, ctx)
     except Exception as e:
         logger.error(f"Failed to edit object: {str(e)}")
         return [TextContent(type="text", text=f"Failed to edit object: {str(e)}")]
@@ -420,7 +533,10 @@ def edit_object(
 
 @mcp.tool()
 def delete_object(
-    ctx: Context, doc_name: str, obj_name: str
+    ctx: Context,
+    doc_name: str,
+    obj_name: str,
+    capture_screenshot: bool = True,
 ) -> list[TextContent | ImageContent]:
     """Delete an object in FreeCAD.
 
@@ -435,7 +551,9 @@ def delete_object(
     try:
         res = freecad.delete_object(doc_name, obj_name)
         screenshot = (
-            freecad.get_active_screenshot() if not _only_text_feedback else None
+            freecad.get_active_screenshot()
+            if (capture_screenshot and not _only_text_feedback)
+            else None
         )
 
         if res["success"]:
@@ -445,14 +563,14 @@ def delete_object(
                     text=f"Object '{res['object_name']}' deleted successfully",
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot)
+            return add_screenshot_if_available(response, screenshot, ctx)
         else:
             response = [
                 TextContent(
                     type="text", text=f"Failed to delete object: {res['error']}"
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot)
+            return add_screenshot_if_available(response, screenshot, ctx)
     except Exception as e:
         logger.error(f"Failed to delete object: {str(e)}")
         return [TextContent(type="text", text=f"Failed to delete object: {str(e)}")]
@@ -489,14 +607,14 @@ def execute_code(
                     type="text", text=f"Code executed successfully: {res['message']}"
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot)
+            return add_screenshot_if_available(response, screenshot, ctx)
         else:
             response = [
                 TextContent(
                     type="text", text=f"Failed to execute code: {res['error']}"
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot)
+            return add_screenshot_if_available(response, screenshot, ctx)
     except Exception as e:
         logger.error(f"Failed to execute code: {str(e)}")
         return [TextContent(type="text", text=f"Failed to execute code: {str(e)}")]
@@ -519,6 +637,7 @@ def get_view(
     width: int | None = None,
     height: int | None = None,
     focus_object: str | None = None,
+    background_color: str = "white",
 ) -> list[ImageContent | TextContent]:
     """Get a screenshot of the active view.
 
@@ -534,9 +653,10 @@ def get_view(
         - "Bottom"
         - "Dimetric"
         - "Trimetric"
-        width: The width of the screenshot in pixels. If not specified, uses the viewport width.
-        height: The height of the screenshot in pixels. If not specified, uses the viewport height.
+        width: The width of the screenshot in pixels. If not specified, uses the default (400px).
+        height: The height of the screenshot in pixels. If not specified, uses the default (300px).
         focus_object: The name of the object to focus on. If not specified, fits all objects in the view.
+        background_color: Background color for the screenshot (e.g. "white", "black", "transparent").
 
     Returns:
         A screenshot of the active view.
@@ -546,10 +666,16 @@ def get_view(
             TextContent(type="text", text="Screenshot not available in text-only mode.")
         ]
     freecad = get_freecad_connection()
-    screenshot = freecad.get_active_screenshot(view_name, width, height, focus_object)
+    screenshot = freecad.get_active_screenshot(
+        view_name, width, height, focus_object, background_color
+    )
 
     if screenshot is not None:
-        return [ImageContent(type="image", data=screenshot, mimeType="image/png")]
+        if _is_cli_client(ctx):
+            path = _save_screenshot_file(screenshot)
+            return [TextContent(type="text", text=f"Screenshot: {path}")]
+        else:
+            return [ImageContent(type="image", data=screenshot, mimeType="image/webp")]
     else:
         return [
             TextContent(
@@ -560,8 +686,165 @@ def get_view(
 
 
 @mcp.tool()
+def snapshot_view(
+    ctx: Context,
+    view_name: Literal[
+        "Isometric",
+        "Front",
+        "Top",
+        "Right",
+        "Back",
+        "Left",
+        "Bottom",
+        "Dimetric",
+        "Trimetric",
+    ] = "Isometric",
+    width: int | None = None,
+    height: int | None = None,
+    focus_object: str | None = None,
+) -> list[TextContent | ImageContent]:
+    """Store a snapshot of the current view for before/after comparison with analyze_view.
+
+    If Gemini CLI is available, also runs a pre-analysis so analyze_view can later
+    describe what changed. Falls back gracefully if Gemini is not installed.
+
+    Args:
+        view_name: Standard view to capture.
+        width: Screenshot width in pixels.
+        height: Screenshot height in pixels.
+        focus_object: Object to zoom to before capturing.
+    """
+    if _only_text_feedback:
+        return [
+            TextContent(
+                type="text", text="snapshot_view not available in text-only mode."
+            )
+        ]
+
+    freecad = get_freecad_connection()
+    screenshot = freecad.get_active_screenshot(view_name, width, height, focus_object)
+    if screenshot is None:
+        return [
+            TextContent(
+                type="text",
+                text="snapshot_view: no screenshot available in current view.",
+            )
+        ]
+
+    analysis = (
+        _call_gemini(
+            screenshot,
+            "Describe this FreeCAD 3D model in detail: structural elements visible, positions, colors, and spatial arrangement.",
+        )
+        or ""
+    )
+
+    _snapshots[view_name] = (screenshot, analysis)
+    msg = f"Snapshot stored for '{view_name}' view."
+    if analysis:
+        msg += f"\nGemini pre-analysis: {analysis}"
+    else:
+        msg += "\n(Gemini CLI not available — snapshot stored without pre-analysis.)"
+    result: list[TextContent | ImageContent] = [TextContent(type="text", text=msg)]
+    if _is_cli_client(ctx):
+        path = _save_screenshot_file(screenshot)
+        result.append(TextContent(type="text", text=f"Screenshot: {path}"))
+    else:
+        result.append(
+            ImageContent(type="image", data=screenshot, mimeType="image/webp")
+        )
+    return result
+
+
+@mcp.tool()
+def analyze_view(
+    ctx: Context,
+    view_name: Literal[
+        "Isometric",
+        "Front",
+        "Top",
+        "Right",
+        "Back",
+        "Left",
+        "Bottom",
+        "Dimetric",
+        "Trimetric",
+    ] = "Isometric",
+    question: str = "Describe what you see in this 3D model. What structural elements are visible, how are they positioned, and does anything look spatially wrong or misaligned?",
+    width: int | None = None,
+    height: int | None = None,
+    focus_object: str | None = None,
+    compare_to_snapshot: bool = False,
+) -> list[TextContent | ImageContent]:
+    """Capture a view and analyze it visually.
+
+    Always returns the screenshot so Claude can see it. If Gemini CLI is installed
+    and authenticated, also returns Gemini's textual analysis. If Gemini is not
+    available, returns the screenshot with a note.
+
+    Args:
+        view_name: Standard view to capture.
+        question: What to ask Gemini. Include design context ("This is a parking lot
+                  structure...") so Gemini understands what to look for.
+        width: Screenshot width in pixels.
+        height: Screenshot height in pixels.
+        focus_object: Object to zoom to before capturing.
+        compare_to_snapshot: If True, includes the prior snapshot_view description
+                             as context so Gemini can describe what changed.
+    """
+    if _only_text_feedback:
+        return [
+            TextContent(
+                type="text", text="analyze_view not available in text-only mode."
+            )
+        ]
+
+    freecad = get_freecad_connection()
+    screenshot = freecad.get_active_screenshot(view_name, width, height, focus_object)
+    if screenshot is None:
+        return [
+            TextContent(
+                type="text",
+                text="analyze_view: no screenshot available in current view.",
+            )
+        ]
+
+    before_analysis: str | None = None
+    if compare_to_snapshot and view_name in _snapshots:
+        _, before_analysis = _snapshots[view_name]
+
+    analysis = _call_gemini(screenshot, question, before_analysis)
+
+    if _is_cli_client(ctx):
+        path = _save_screenshot_file(screenshot)
+        result: list[TextContent | ImageContent] = [
+            TextContent(type="text", text=f"Screenshot: {path}")
+        ]
+    else:
+        result = [ImageContent(type="image", data=screenshot, mimeType="image/webp")]
+    if analysis:
+        result.append(
+            TextContent(type="text", text=f"**Gemini visual analysis:**\n\n{analysis}")
+        )
+    else:
+        if not shutil.which("gemini"):
+            result.append(
+                TextContent(
+                    type="text",
+                    text=(
+                        "Gemini CLI not found — visual analysis unavailable. "
+                        "Install Gemini CLI for enhanced visual verification."
+                    ),
+                )
+            )
+    return result
+
+
+@mcp.tool()
 def insert_part_from_library(
-    ctx: Context, relative_path: str
+    ctx: Context,
+    relative_path: str,
+    capture_screenshot: bool = False,
 ) -> list[TextContent | ImageContent]:
     """Insert a part from the parts library addon.
 
@@ -575,7 +858,9 @@ def insert_part_from_library(
     try:
         res = freecad.insert_part_from_library(relative_path)
         screenshot = (
-            freecad.get_active_screenshot() if not _only_text_feedback else None
+            freecad.get_active_screenshot()
+            if (capture_screenshot and not _only_text_feedback)
+            else None
         )
 
         if res["success"]:
@@ -584,7 +869,9 @@ def insert_part_from_library(
                     type="text", text=f"Part inserted from library: {res['message']}"
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot)
+            return add_screenshot_if_available(
+                response, screenshot, ctx, screenshot_attempted=capture_screenshot
+            )
         else:
             response = [
                 TextContent(
@@ -592,7 +879,9 @@ def insert_part_from_library(
                     text=f"Failed to insert part from library: {res['error']}",
                 ),
             ]
-            return add_screenshot_if_available(response, screenshot)
+            return add_screenshot_if_available(
+                response, screenshot, ctx, screenshot_attempted=capture_screenshot
+            )
     except Exception as e:
         logger.error(f"Failed to insert part from library: {str(e)}")
         return [
@@ -607,6 +896,7 @@ def get_objects(
     ctx: Context,
     doc_name: str,
     detailed: bool = False,
+    capture_screenshot: bool = False,
 ) -> list[TextContent | ImageContent]:
     """Get all objects in a document.
     You can use this tool to get the objects in a document to see what you can check or edit.
@@ -633,12 +923,16 @@ def get_objects(
                 )
             ]
         screenshot = (
-            freecad.get_active_screenshot() if not _only_text_feedback else None
+            freecad.get_active_screenshot()
+            if (capture_screenshot and not _only_text_feedback)
+            else None
         )
         response = [
             TextContent(type="text", text=json.dumps(result["objects"])),
         ]
-        return add_screenshot_if_available(response, screenshot)
+        return add_screenshot_if_available(
+            response, screenshot, ctx, screenshot_attempted=capture_screenshot
+        )
     except Exception as e:
         logger.error(f"Failed to get objects: {str(e)}")
         return [TextContent(type="text", text=f"Failed to get objects: {str(e)}")]
@@ -646,7 +940,10 @@ def get_objects(
 
 @mcp.tool()
 def get_object(
-    ctx: Context, doc_name: str, obj_name: str
+    ctx: Context,
+    doc_name: str,
+    obj_name: str,
+    capture_screenshot: bool = False,
 ) -> list[TextContent | ImageContent]:
     """Get an object from a document.
     You can use this tool to get the properties of an object to see what you can check or edit.
@@ -668,12 +965,16 @@ def get_object(
                 )
             ]
         screenshot = (
-            freecad.get_active_screenshot() if not _only_text_feedback else None
+            freecad.get_active_screenshot()
+            if (capture_screenshot and not _only_text_feedback)
+            else None
         )
         response = [
             TextContent(type="text", text=json.dumps(result["object"])),
         ]
-        return add_screenshot_if_available(response, screenshot)
+        return add_screenshot_if_available(
+            response, screenshot, ctx, screenshot_attempted=capture_screenshot
+        )
     except Exception as e:
         logger.error(f"Failed to get object: {str(e)}")
         return [TextContent(type="text", text=f"Failed to get object: {str(e)}")]
