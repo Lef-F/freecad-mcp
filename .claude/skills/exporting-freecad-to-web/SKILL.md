@@ -33,9 +33,9 @@ a new web-export setup, or when resuming an existing one for a different documen
 SKILL=".claude/skills/exporting-freecad-to-web"
 DEST=".designs/<doc-name>/web-export"   # replace <doc-name> with FreeCAD doc name
 
-mkdir -p "$DEST/assets" "$DEST/exports"
+mkdir -p "$DEST/public/assets" "$DEST/public/exports"
 cp "$SKILL/scripts/export_glb.py"  "$DEST/"
-cp "$SKILL/reference/index.html"   "$DEST/"
+cp "$SKILL/reference/index.html"   "$DEST/public/"
 cp "$SKILL/reference/package.json" "$DEST/"
 cd "$DEST"
 ```
@@ -45,25 +45,27 @@ All remaining steps assume you are inside `web-export/`.
 Final structure (before first export):
 ```
 web-export/
-  assets/          # sky.hdr goes here (Step 2)
-  exports/         # written by export script (Step 4)
-  export_glb.py
-  index.html
-  package.json
+  export_glb.py        # export script (dev only, not deployed)
+  package.json         # npm scripts (dev only, not deployed)
+  sync-to-s3.sh        # S3 deploy script (dev only, not deployed)
+  public/              # everything here gets deployed — nothing else
+    index.html
+    assets/            # sky.hdr goes here (Step 2)
+    exports/           # written by export script (Step 4)
 ```
 
 ### 2. Obtain a sky HDR file
 
-The viewer requires an equirectangular HDR environment map at `assets/sky.hdr`.
+The viewer requires an equirectangular HDR environment map at `public/assets/sky.hdr`.
 
 - Download any 2k `.hdr` from [Polyhaven](https://polyhaven.com/hdris)
   (sky/overcast categories work best for outdoor architecture)
-- Rename it to `sky.hdr` and place it in `web-export/assets/`
+- Rename it to `sky.hdr` and place it in `web-export/public/assets/`
 - File size ~1 MB for 2k resolution
 
 ### 3. Customize the viewer
 
-Open `web-export/index.html`. All project-specific values are in the `CONFIG`
+Open `web-export/public/index.html`. All project-specific values are in the `CONFIG`
 block near the top of the `<script type="module">` section.
 
 **a. Title and UI strings**
@@ -116,7 +118,7 @@ The script:
 2. Exports all visible `MCP_Role=Final` objects via `ImportGui.export()`
 3. Applies cleanup: dedup root nodes, strip alpha-0, merge materials, fix Z-fighting
 4. Centers the model at origin (X=0, Z=0, Y_min=0)
-5. Writes `exports/<doc_name>.gltf` + `.bin` + `export-info.json`
+5. Writes `public/exports/<doc_name>.gltf` + `.bin` + `export-info.json`
 
 On success:
 ```
@@ -230,8 +232,8 @@ After these changes, the page opens at your calibrated view on every reload.
 
 ## Verification
 
-- `exports/<doc_name>.gltf` exists with a non-zero `.bin` beside it
-- `exports/export-info.json` contains a valid timestamp and `triangles > 0`
+- `public/exports/<doc_name>.gltf` exists with a non-zero `.bin` beside it
+- `public/exports/export-info.json` contains a valid timestamp and `triangles > 0`
 - Model loads in browser without "NO MODEL FOUND" / "ERROR LOADING MODEL"
 - Sun sphere rises from the correct compass direction for the real site location
 - Shadow direction is consistent with sun position at all slider times

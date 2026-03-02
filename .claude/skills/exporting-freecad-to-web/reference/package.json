@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "serve": "npx serve . -l 3001 --cors",
+    "serve": "npx serve public -l 3001 --cors",
     "export": "uv run export_glb.py",
     "export:clean": "uv run export_glb.py && npm run serve"
   }

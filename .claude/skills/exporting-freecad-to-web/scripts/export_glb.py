@@ -652,7 +652,7 @@ def main():
         "--output",
         "-o",
         default=None,
-        help="Output file path (default: web-export/exports/<doc_name>.gltf)",
+        help="Output file path (default: web-export/public/exports/<doc_name>.gltf)",
     )
     parser.add_argument(
         "--format",
@@ -694,7 +694,7 @@ def main():
         if args.output:
             out_path = args.output
         else:
-            exports_dir = Path(__file__).parent / "exports"
+            exports_dir = Path(__file__).parent / "public" / "exports"
             exports_dir.mkdir(exist_ok=True)
             out_path = str(exports_dir / f"{doc_name}{ext}")
 
