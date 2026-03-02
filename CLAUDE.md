@@ -56,6 +56,16 @@ Most mutation tools return a base64 PNG screenshot. The addon checks view compat
 
 **Graceful degradation**: When the active view doesn't support `saveImage` (TechDraw, Spreadsheet), the screenshot is skipped and a text note is returned instead. The tool never fails due to a missing screenshot.
 
+### Visibility Convention — `MCP_Role` Tagging
+
+Every object in a FreeCAD document gets an `App::PropertyEnumeration` called `MCP_Role` (values: `Final`, `Intermediate`, `Alternative`, `Deprecated`). This drives all visibility management. See `.claude/context/mcp-role-tagging.md` for the full convention, scripts (`show_by_role()`, `tag_all_objects()`), and Claude's rules.
+
+**Core rules:**
+- Every new object MUST get `MCP_Role` set at creation time
+- Use `show_by_role(doc, ["Final"])` as the baseline for all visibility management
+- Manual `.Visibility` toggles are allowed for targeted adjustments (e.g., temporarily hiding a wall for interior views), but only after establishing a baseline with `show_by_role()` — always restore with `show_by_role()` afterward
+- When unsure about an object's role, ask the user
+
 ### Known Limitations
 
 - **`FreeCAD.Color` missing in FreeCAD 1.0.2**: The `App.Color` class doesn't exist in older releases. `serialize.py` guards this with `hasattr(App, "Color")` to avoid `AttributeError` crashes in `get_objects`/`get_object`.

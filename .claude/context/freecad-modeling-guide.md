@@ -26,10 +26,21 @@ Gui.SendMsgToActiveView("ViewFit")
 Gui.SendMsgToActiveView("ViewIsometric")
 ```
 
-### Hide noise objects before any screenshot
+### Visibility management — use `MCP_Role` tagging
 
-See `freecad-visibility.md` for the canonical always-hidden type list and cleanup scripts. Quick version for the common case:
+For documents with `MCP_Role` tagging (see `mcp-role-tagging.md`), use `show_by_role()` for all visibility management:
 
+```python
+# Before any screenshot — show only Final objects
+show_by_role(doc, ["Final"])
+
+# To also see alternative designs
+show_by_role(doc, ["Final", "Alternative"])
+```
+
+This replaces manual noise-hiding loops and named container lists. The function handles containers, Body Tips, cascade cleanup, and TechDraw safety automatically.
+
+**For untagged documents**, fall back to the type-based noise filter from `freecad-visibility.md`:
 ```python
 noise = {"App::Origin", "App::Line", "App::Plane", "App::OriginFeature"}
 for obj in doc.Objects:
@@ -37,11 +48,9 @@ for obj in doc.Objects:
         obj.ViewObject.Visibility = False
 ```
 
-For documents with TechDraw pages, use the full `always_hidden_types` set from `freecad-visibility.md`.
-
 ### Never do blanket visibility restore
 
-Setting all objects visible floods the viewport — a document with 30 Part/Body containers has 210+ origin objects. **Track which objects were visible before any exploration and restore only those.** See `freecad-visibility.md` for the full container hierarchy, propagation mechanism, and the "Final Objects" principle.
+Setting all objects visible floods the viewport — a document with 30 Part/Body containers has 210+ origin objects. **Use `show_by_role(doc, ["Final"])` to restore a clean view.** See `mcp-role-tagging.md` for the full convention and `freecad-visibility.md` for the underlying mechanics.
 
 ---
 
@@ -197,28 +206,34 @@ cut = doc.addObject("Part::Cut", "FloorWithOpening")
 cut.Base = doc.getObject("SecondFloor")   # the solid to cut from
 cut.Tool = hole                            # the shape to subtract
 
-# 3. Hide source objects (they are consumed by the Cut)
+# 3. Tag and hide source objects (they are consumed by the Cut)
 doc.getObject("SecondFloor").ViewObject.Visibility = False
+doc.getObject("SecondFloor").MCP_Role = "Intermediate"
 hole.ViewObject.Visibility = False
+hole.MCP_Role = "Intermediate"
+
+# 4. Tag the result as Final
+cut.MCP_Role = "Final"
 ```
 
-The `Part::Cut` result (`FloorWithOpening`) is the visible object. The originals remain in the document but are hidden.
+The `Part::Cut` result (`FloorWithOpening`) is the visible object. The originals remain in the document but are hidden and tagged `Intermediate`.
 
 ---
 
 ## Visibility Control for Exploration
 
-Hide walls on the "open" sides of a building to see the interior:
+For tagged documents, use `show_by_role()` as the baseline, then temporarily hide specific objects for interior views:
 
 ```python
-for name in ["WallSouth", "WallEast", "Wall2South", "Wall2East"]:
+# Start from clean state
+show_by_role(doc, ["Final"])
+
+# Temporarily hide walls on open sides to see interior
+for name in ["WallSouth", "WallEast"]:
     doc.getObject(name).ViewObject.Visibility = False
 ```
 
-To restore:
-```python
-doc.getObject("WallSouth").ViewObject.Visibility = True
-```
+To restore after exploration, re-run `show_by_role(doc, ["Final"])` — never manually toggle objects back on.
 
 From an isometric view, hiding the south and east walls exposes the interior while keeping north and west walls for spatial reference.
 
@@ -255,8 +270,18 @@ def place(obj, x, y, z):
 import FreeCAD as App
 doc = App.getDocument("MyDoc")
 
+ENUM_VALUES = ["Final", "Intermediate", "Alternative", "Deprecated"]
+
 def place(obj, x, y, z):
     obj.Placement = App.Placement(App.Vector(x, y, z), App.Rotation(App.Vector(0,0,1), 0))
+
+def tag(obj, role="Final"):
+    """Tag object with MCP_Role — MANDATORY for every new object."""
+    if not hasattr(obj, "MCP_Role"):
+        obj.addProperty("App::PropertyEnumeration", "MCP_Role", "MCP",
+            "Object role: Final, Intermediate, Alternative, Deprecated")
+        obj.MCP_Role = ENUM_VALUES
+    obj.MCP_Role = role
 
 for i in range(n):
     obj = doc.addObject("Part::Box", f"Item{i:02d}")
@@ -264,6 +289,7 @@ for i in range(n):
     obj.Width  = ...
     obj.Height = ...
     place(obj, x0 + i * step, y0, z0)
+    tag(obj, "Final")
 
 doc.recompute()
 print("Done")
@@ -301,4 +327,4 @@ The `print` output is returned in the tool response — confirm success.
 - **Rotated / non-axis-aligned geometry**: `Shape.BoundBox` is the axis-aligned bounding box of the rotated shape — larger than the actual footprint. For rotated objects, extract actual vertices (`obj.Shape.Vertexes`) and compute geometry from edge directions. Use `Part.makePolygon` + `Part.Face` + `face.extrude()` for solids aligned with actual edges.
 - **Multi-object assembly coverage**: never compare an individual object's BoundBox against the overall perimeter in isolation — multiple objects may jointly cover a boundary. See `designs-store.md` for the full anti-pattern.
 - **Terrain surface detection**: `solid.common(box).BoundBox.ZMax` can return false highs when sampling inside a hillside. See `designs-store.md` for details.
-- **Visibility pitfalls**: see `freecad-visibility.md` — covers blanket visibility restore, MDI window capture, TechDraw crash danger, and App::Origin noise.
+- **Visibility pitfalls**: see `mcp-role-tagging.md` for the `MCP_Role` convention (`show_by_role()`) and `freecad-visibility.md` for the underlying mechanics (TechDraw crash, Body Tip, cascade propagation).

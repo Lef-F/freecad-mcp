@@ -344,17 +344,19 @@ get_view("Isometric", 400, 400)   # 3D overview — massing, proportions
 
 ## Visibility for Interior Views
 
-Hide exterior walls on open sides to see interior:
+**For tagged documents** (preferred): start from a clean baseline with `show_by_role(doc, ["Final"])`, then temporarily hide open-side walls:
 
 ```python
-# Hide south and east walls for isometric interior view
+show_by_role(doc, ["Final"])  # clean baseline
+
+# Temporarily hide south and east walls for isometric interior view
 for label in ["Wall_GF_South", "Wall_GF_East", "Wall_FF_South", "Wall_FF_East"]:
     obj = doc.getObjectsByLabel(label)
     if obj:
         obj[0].ViewObject.Visibility = False
 ```
 
-Restore with `Visibility = True`.
+To restore, re-run `show_by_role(doc, ["Final"])` — never manually toggle objects back on. See `mcp-role-tagging.md` for the full convention.
 
 ---
 
@@ -370,4 +372,4 @@ Restore with `Visibility = True`.
 
 5. **Recompute ordering**: Complex Arch objects (especially roofs and stairs) may need multiple recomputes. If geometry looks wrong, try `doc.recompute()` twice.
 
-6. **Draft baselines visible**: Hide Draft lines after creating walls from them: `line.ViewObject.Visibility = False`.
+6. **Draft baselines visible**: Hide Draft lines after creating walls from them and tag them `MCP_Role = "Intermediate"`: `line.ViewObject.Visibility = False`.

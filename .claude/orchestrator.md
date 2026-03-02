@@ -31,7 +31,7 @@ Based on the classified area(s), load the relevant context files:
 - `packaging` or release work → Read skill `preparing-release`
 - `freecad-modeling` → Read `.claude/context/freecad-modeling-guide.md`, use skill `modeling-in-freecad`; if working with rotated structures or local coordinate frames also read `.claude/context/freecad-origins.md`
 - `freecad-architecture` → Read `.claude/context/freecad-arch-guide.md`, use skill `architecting-in-freecad`; also read `freecad-modeling-guide.md` for base patterns; read `freecad-origins.md` for sketch attachment patterns
-- `viewport/visibility` → Read `.claude/context/freecad-visibility.md` and `.claude/context/freecad-origins.md`
+- `viewport/visibility` → Read `.claude/context/mcp-role-tagging.md` (primary — `MCP_Role` convention and `show_by_role()`), `.claude/context/freecad-visibility.md` (reference — type lists, Body Tip, cascade details), and `.claude/context/freecad-origins.md`
 - `freecad-modeling` or `freecad-architecture` (grouping/organization) → Read `.claude/context/freecad-grouping.md`
 - `freecad-modeling` or `freecad-architecture` (TechDraw, technical drawings, sections) → Read `.claude/context/freecad-drawings.md`
 - `rpc-handler` or `serialization` or `mcp-server` (looking up FreeCAD API, property names, type strings) → Read `.claude/context/freecad-source.md`

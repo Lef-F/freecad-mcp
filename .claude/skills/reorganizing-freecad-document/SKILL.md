@@ -140,6 +140,16 @@ print(f"Ungrouped roots: {[o.Label for o in ungrouped]}")  # should be []
 
 Also check drawings still render: open each TechDraw page and confirm no red/broken view markers.
 
+### 6b. Tag all objects with MCP_Role
+
+After reorganization, ensure all objects are tagged (see `mcp-role-tagging.md`):
+```python
+n = tag_all_objects(doc)
+print(f"Tagged {n} untagged objects as Intermediate")
+show_by_role(doc, ["Final"])  # verify the final view is correct
+```
+Review the Final set — reorganization may have shifted objects that need role adjustment.
+
 ### 7. Update .designs/ documentation
 
 Update all four canonical files in `.designs/<doc-name>/`:

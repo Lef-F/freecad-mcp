@@ -142,4 +142,4 @@ For a construction/architecture design:
 📁 Measurements
 ```
 
-Hidden folders should have their visibility off; move intermediate/construction objects there to keep the viewport clean.
+Hidden folders contain `Intermediate` objects. With `MCP_Role` tagging (see `mcp-role-tagging.md`), objects in these folders should be tagged `MCP_Role = "Intermediate"`. Running `show_by_role(doc, ["Final"])` will hide them automatically — no need to manually track group visibility.

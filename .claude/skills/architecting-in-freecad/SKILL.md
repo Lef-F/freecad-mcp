@@ -105,6 +105,16 @@ Levels are the backbone of architectural design. Define them as a Python dict at
 
 See `freecad-arch-guide.md` > "Level Definitions" for the standard pattern.
 
+### MCP_Role tagging setup
+
+At the start of every session, ensure all objects are tagged (see `mcp-role-tagging.md`):
+```python
+n = tag_all_objects(doc)  # tags untagged objects as Intermediate
+if n > 0:
+    print(f"Tagged {n} untagged objects as Intermediate")
+show_by_role(doc, ["Final"])  # restore clean view
+```
+
 ### Create the BIM hierarchy
 
 Create Site → Building → Floor(s) using `Arch.makeSite()`, `Arch.makeBuilding()`, `Arch.makeFloor()`. Nest them: elements → floor → building → site.
@@ -122,9 +132,9 @@ Create the structural skeleton: slabs and load-bearing walls (or columns for fra
 - **Slabs**: Use `Arch.makeStructure()` — see `arch-api-reference.md` > "Structures"
 - **Walls**: Use `Arch.makeWall()` with or without Draft baselines — see `freecad-arch-guide.md` > "Wall Creation Patterns"
 
-**Batch all walls for a floor in one `execute_code` block.** Name them by floor and orientation: `Wall_GF_South`, `Wall_GF_North`, `Wall_1F_East`, etc.
+**Batch all walls for a floor in one `execute_code` block.** Name them by floor and orientation: `Wall_GF_South`, `Wall_GF_North`, `Wall_1F_East`, etc. **Tag every new object with `MCP_Role`** — walls/slabs are `"Final"`, Draft baselines are `"Intermediate"`. See `mcp-role-tagging.md` for the tagging code pattern.
 
-> **Checkpoint**: Screenshot after all walls for a floor. Verify wall positions, heights, and that they sit at the correct level.
+> **Checkpoint**: Use `show_by_role(doc, ["Final"])` before taking screenshots. Verify wall positions, heights, and that they sit at the correct level.
 
 ---
 
@@ -198,7 +208,7 @@ See `arch-api-reference.md` > "Roofs" for the function signature.
 
 ### Multi-view verification
 
-Capture all standard views: `["Isometric", "Top", "Front", "Right"]` using `get_view(view_name, 400, 400)`.
+Before capturing views, ensure a clean viewport: `show_by_role(doc, ["Final"])`. Then capture all standard views: `["Isometric", "Top", "Front", "Right"]` using `get_view(view_name, 400, 400)`.
 
 | View | Check |
 |------|-------|
@@ -267,5 +277,7 @@ Stop and ask the user when:
 - [ ] Room areas meet program requirements (spot-check 2-3 rooms)
 - [ ] Window/door positions checked in elevation views
 - [ ] Stair rise verified: 150-200mm, comfort formula satisfied
+- [ ] **All objects tagged with `MCP_Role`** — run `tag_all_objects(doc)` to catch any missed objects
+- [ ] **`show_by_role(doc, ["Final"])` produces a clean view** with only finished geometry visible
 - [ ] `doc.recompute()` called after last change
 - [ ] User confirmed the design matches their intent

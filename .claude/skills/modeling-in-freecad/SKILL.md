@@ -98,6 +98,16 @@ doc_name = "ProjectName"
 
 If working in an existing document, call `list_documents` to confirm it's open, then `get_objects` to understand what's already there.
 
+### MCP_Role tagging setup
+
+At the start of every session, ensure all objects are tagged (see `mcp-role-tagging.md`):
+```python
+n = tag_all_objects(doc)  # tags untagged objects as Intermediate
+if n > 0:
+    print(f"Tagged {n} untagged objects as Intermediate")
+show_by_role(doc, ["Final"])  # restore clean view
+```
+
 > **Checkpoint**: Show the user what exists. Confirm the starting point before adding anything.
 
 ### Design knowledge store
@@ -127,6 +137,18 @@ Use `execute_code` for batches of related objects. Always:
 - Define a `place(obj, x, y, z)` helper at the top
 - Name objects descriptively (`WallSouth`, `Step01`, not `Box001`)
 - Zero-pad numbered series (`Step01`…`Step13`)
+- **Tag every new object with `MCP_Role` immediately** (see `mcp-role-tagging.md`):
+  ```python
+  obj = doc.addObject("Part::Feature", "WallSouth")
+  obj.Shape = solid
+  # Tag — MANDATORY for every new object
+  if not hasattr(obj, "MCP_Role"):
+      obj.addProperty("App::PropertyEnumeration", "MCP_Role", "MCP",
+          "Object role: Final, Intermediate, Alternative, Deprecated")
+      obj.MCP_Role = ["Final", "Intermediate", "Alternative", "Deprecated"]
+  obj.MCP_Role = "Final"  # or "Intermediate" for construction geometry
+  ```
+  **When in doubt about the role, ask the user.** Never skip tagging.
 - End every block with `doc.recompute()` and `print("Done")`
 - **Save after every verified batch**: `doc.save()` — FreeCAD crashes lose unsaved work
 
@@ -139,14 +161,12 @@ analyze_view("Isometric", width=400, height=400, prompt="Describe what you see..
 
 **Before taking any screenshot:**
 1. Switch the active MDI window to the 3D view — see `freecad-modeling-guide.md` "Viewport Management" for the MDI switching pattern.
-2. Hide noise objects (see `freecad-visibility.md` for the full type list):
+2. Use `show_by_role()` from `mcp-role-tagging.md` to set visibility cleanly:
 ```python
-noise = {"App::Origin", "App::Line", "App::Plane", "App::OriginFeature"}
-for obj in doc.Objects:
-    if hasattr(obj, "ViewObject") and obj.TypeId in noise:
-        obj.ViewObject.Visibility = False
+show_by_role(doc, ["Final"])
 ```
-3. Show only the objects relevant to the current task — not everything. Never run a blanket "make all objects visible" loop.
+This handles noise hiding, container chains, Body Tips, and TechDraw safety automatically. For untagged documents, fall back to the manual noise filter from `freecad-visibility.md`.
+3. To show specific objects beyond the Final set for context, temporarily toggle them after `show_by_role`. Restore with `show_by_role(doc, ["Final"])` afterward.
 
 **⚠️ CRITICAL: Never set `.Visibility = True` on `TechDraw::DrawPage` — it CRASHES FreeCAD** (see `freecad-visibility.md`).
 

@@ -61,6 +61,8 @@ These may be visible during active editing but should be re-hidden after:
 
 ## How to Identify Accidentally Visible Objects
 
+> **For tagged documents**: Use `show_by_role(doc, ["Final"])` from `mcp-role-tagging.md` instead — it handles all visibility automatically. The query below is a **fallback for untagged documents** only.
+
 Run this query to find visible objects whose TypeId should be hidden:
 
 ```python
@@ -102,6 +104,8 @@ for l in leaks:
 ---
 
 ## Bulk Visibility Cleanup
+
+> **For tagged documents**: Use `show_by_role(doc, ["Final"])` from `mcp-role-tagging.md` instead. The type-based cleanup below is a **fallback for untagged documents** only.
 
 To hide all accidentally-visible internal objects:
 
@@ -173,15 +177,22 @@ for t, n in hid_types.most_common(20):
 
 ---
 
-## The "Final Objects" Principle
+## The "Final Objects" Principle — now encoded as `MCP_Role`
 
 A well-maintained document has a clear two-tier structure:
 
-**Tier 1 — Final/published objects** (visible): The finished 3D geometry that represents the design. These are typically `PartDesign::Body`, `App::Part`, `Part::Feature`, `Part::FeaturePython` (arrays), and `Part::Extrusion` objects with meaningful labels.
+**Tier 1 — Final/published objects** (`MCP_Role = "Final"`): The finished 3D geometry that represents the design. These are typically `PartDesign::Body`, `Part::Feature`, `Part::FeaturePython` (arrays), and `Part::Extrusion` objects with meaningful labels.
 
-**Tier 2 — Supporting objects** (hidden): Everything else — sketches, binders, pads/pockets, construction chains, section planes, dimensions. These exist to build the Tier 1 objects but are not "the design."
+**Tier 2 — Supporting objects** (`MCP_Role = "Intermediate"`): Everything else — sketches, binders, pads/pockets, construction chains, section planes, dimensions. These exist to build the Tier 1 objects but are not "the design."
 
-When a user says "show me only the finished design", they mean Tier 1 only. When exploring spatial relationships or debugging geometry, you may need to temporarily show Tier 2 objects — but always restore their visibility afterward.
+**This principle is now enforced programmatically** via the `MCP_Role` property on every object. See `mcp-role-tagging.md` for the full convention, enum values (`Final`, `Intermediate`, `Alternative`, `Deprecated`), the `show_by_role()` script, and Claude's rules for tagging.
+
+**The canonical way to show only the finished design:**
+```python
+show_by_role(doc, ["Final"])
+```
+
+This replaces noise filters, named container lists, and blanket visibility loops as the baseline approach. Manual `.Visibility` toggles are still allowed for targeted adjustments (e.g., temporarily hiding a wall for interior views) — but always start from `show_by_role()` and restore with it afterward. The function handles containers, Body Tips, cascade cleanup, and TechDraw safety automatically.
 
 ---
 
@@ -287,6 +298,38 @@ body.Tip = body.Group[-1]
 doc.recompute()
 ```
 
+### Showing a Body After a Bulk Hide
+
+A common pattern is "hide everything, then show just what I need." This breaks Bodies because the hide-all loop sets `Visibility=False` on the Tip feature inside the Body. When you later set `body.ViewObject.Visibility = True`, the Body is "visible" but its Tip feature is still hidden — so nothing renders.
+
+> **For tagged documents**: `show_by_role()` from `mcp-role-tagging.md` handles Body Tips automatically (it computes a TIP_SET). The helpers below are used **internally by `show_by_role()`** and as **standalone fallback for untagged documents**.
+
+```python
+def show_body(body):
+    """Show a PartDesign::Body, ensuring its Tip feature is also visible."""
+    body.ViewObject.Visibility = True
+    if body.Tip and hasattr(body.Tip, "ViewObject"):
+        body.Tip.ViewObject.Visibility = True
+
+def show_object(obj):
+    """Show any object, handling Body/Part containers correctly."""
+    if not hasattr(obj, "ViewObject"):
+        return
+    obj.ViewObject.Visibility = True
+    if obj.TypeId == "PartDesign::Body" and obj.Tip:
+        obj.Tip.ViewObject.Visibility = True
+    elif obj.TypeId == "App::Part":
+        # App::Part uses extensionShow() which restores children —
+        # but if children were hidden by a bulk loop, they stay hidden.
+        # Recursively ensure visible children's Bodies have Tip visible.
+        for child in obj.Group:
+            if hasattr(child, "ViewObject") and child.ViewObject.Visibility:
+                if child.TypeId == "PartDesign::Body" and child.Tip:
+                    child.Tip.ViewObject.Visibility = True
+```
+
+**The same applies to App::Part containers** — if a Part contains Bodies, showing the Part alone may not be enough if the Bodies' Tips were individually hidden.
+
 ### Why intermediate features appear visible
 
 When `Body::addObject()` adds a new solid feature, it automatically sets `Visibility=False` on all other visible solid features in the Body (source: `Body.cpp` lines 236-268). So in a well-managed Body, only the Tip is ever visible.
@@ -306,6 +349,7 @@ doc.recompute()
 
 | Gotcha | What happens | Fix |
 |--------|-------------|-----|
+| **Body visible but nothing shows** | A "hide all" loop sets `Visibility=False` on every object including the Tip feature inside each Body. Later, showing the Body alone is NOT enough — the Tip feature is still hidden inside, so the Body appears invisible. | After a bulk hide, always ensure the Tip is visible when showing a Body (see recipe below). |
 | Hiding a Part modifies children's Visibility | `extensionHide()` iterates children and sets `Visibility=false` on visible ones. If you hide a Part that contains a Body, the Body's Visibility is set to false. Re-showing the Part calls `extensionShow()` which restores them. | Use the parent toggle pattern — it handles restore automatically. |
 | `DisplayModeBody="Through"` leaks intermediate features | All construction steps become visible at the Body level | Always ensure inactive Bodies are in `"Tip"` mode |
 | Tip auto-advance may not fire on `obj.Shape = ...` | If you set a shape directly on a Part::Feature inside a Body rather than using PartDesign operations, Tip does not auto-advance | Set `body.Tip = feature` manually after direct shape assignment |
@@ -319,7 +363,7 @@ doc.recompute()
 
 ## Practical: Restoring a Clean View in a Complex Document
 
-The correct approach for a document with many bodies and parts:
+> **For tagged documents**: Use `show_by_role(doc, ["Final"])` from `mcp-role-tagging.md` — this is the primary, reliable approach. The manual container-based pattern below is a **fallback for untagged documents** where `MCP_Role` properties have not yet been applied.
 
 ```python
 import FreeCAD as App
@@ -332,10 +376,11 @@ top_level_show = {"MainAssembly", "Terrain", "Building"}  # adjust to your docum
 top_level_hide = {"TempConstruction", "DebugBody"}  # adjust to your document
 
 # ── Step 2: Toggle only the top-level containers ──
+# Use show_object() (defined above) to handle Body Tip visibility correctly
 for name in top_level_show:
     obj = doc.getObject(name)
     if obj and hasattr(obj, "ViewObject"):
-        obj.ViewObject.Visibility = True
+        show_object(obj)  # NOT just obj.ViewObject.Visibility = True
 
 for name in top_level_hide:
     obj = doc.getObject(name)
