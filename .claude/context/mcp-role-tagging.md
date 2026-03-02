@@ -96,11 +96,14 @@ def show_by_role(doc, roles=None):
     # --- The full set of things that should be visible ---
     show_set = tagged_show | containers | tips
 
-    # --- Pass 1: Hide everything (skip TechDraw — crash risk) ---
+    # --- Pass 1: Hide everything ---
+    # Setting TechDraw::DrawPage.Visibility = False is safe (closes the tab).
+    # Setting it to True CRASHES FreeCAD — guarded in Pass 2.
+    # Skip other TechDraw view objects (DrawViewPart etc.) to avoid touching drawing content.
     for obj in doc.Objects:
         if not hasattr(obj, "ViewObject") or obj.ViewObject is None:
             continue
-        if obj.TypeId.startswith("TechDraw"):
+        if obj.TypeId.startswith("TechDraw") and obj.TypeId != "TechDraw::DrawPage":
             continue
         try:
             obj.ViewObject.Visibility = False
@@ -108,6 +111,7 @@ def show_by_role(doc, roles=None):
             pass
 
     # --- Pass 2: Show the SHOW_SET ---
+    # Never set any TechDraw object to True — DrawPage.Visibility = True CRASHES FreeCAD.
     for obj in doc.Objects:
         if obj.Name in show_set:
             if not hasattr(obj, "ViewObject") or obj.ViewObject is None:
@@ -120,13 +124,14 @@ def show_by_role(doc, roles=None):
                 pass
 
     # --- Pass 3: Cleanup cascade pollution ---
-    # Showing containers may have cascaded to children not in show_set.
-    # Re-hide anything that's visible but shouldn't be.
+    # Showing containers cascades visibility to their children in FreeCAD.
+    # Re-hide anything visible that isn't in show_set.
+    # DrawPage is safe to set False; skip other TechDraw view objects.
     for obj in doc.Objects:
         if obj.Name not in show_set:
             if not hasattr(obj, "ViewObject") or obj.ViewObject is None:
                 continue
-            if obj.TypeId.startswith("TechDraw"):
+            if obj.TypeId.startswith("TechDraw") and obj.TypeId != "TechDraw::DrawPage":
                 continue
             if obj.ViewObject.Visibility:
                 try:

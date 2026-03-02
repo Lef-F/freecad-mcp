@@ -185,6 +185,29 @@ uv run freecad-mcp
 uv run freecad-mcp --only-text-feedback --host 192.168.1.100
 ```
 
+## Running Python Scripts — Always Use `uv run`
+
+**All local Python execution must go through `uv run`.** Never use bare `python3` — it may lack dependencies and does not use the project's virtual environment.
+
+### Transient dependencies with `--with`
+
+For one-off scripts that need packages not in the project's `pyproject.toml`, use `uv run --with` to install them transiently (they do not persist in the project or pollute `pyproject.toml`):
+
+```bash
+# One-off numpy calculation
+uv run --with numpy python3 -c "import numpy as np; print(np.array([1,2,3]).mean())"
+
+# Script that needs scipy
+uv run --with scipy python3 my_script.py
+
+# Multiple transient deps
+uv run --with numpy --with scipy python3 -c "..."
+```
+
+**When to use transient deps**: calculations, data processing, mesh analysis, geometry math — anything that needs a library for a one-shot task but isn't part of the MCP server or addon code.
+
+**Never add transient-use packages to `pyproject.toml`** — only add packages that the MCP server itself imports at runtime.
+
 ## Code Quality
 
 ### Tools

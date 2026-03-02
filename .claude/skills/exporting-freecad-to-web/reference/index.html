@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<!--
+  Three.js 3D Viewer Template
+  Part of the exporting-freecad-to-web skill.
+
+  Quick-start:
+    1. Update the CONFIG block below (title, solar coords, timezone, date).
+    2. Put a sky .hdr file at assets/sky.hdr.
+    3. Run `npm run export` then `npm run serve`.
+    4. Calibrate MODEL_NORTH_OFFSET (see SKILL.md Step 6).
+    5. Set default camera position (see SKILL.md Step 7).
+-->
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<!-- TODO: set your project name -->
+<title>My Project – 3D Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  canvas {
+    display: block; width: 100%; height: 100%;
+    background: linear-gradient(to bottom, #7aa0be 0%, #b8ccda 55%, #cdd6d8 100%);
+  }
+  .overlay {
+    position: fixed; top: 1.4rem; left: 1.6rem;
+    z-index: 10; pointer-events: none;
+  }
+  .overlay h1 {
+    font-size: 1rem; font-weight: 600; color: #fff;
+    letter-spacing: 0.04em; text-shadow: 0 1px 6px rgba(0,0,0,0.55);
+  }
+  .overlay .subtitle {
+    font-size: 0.76rem; color: rgba(255,255,255,0.82);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.5); margin-top: 0.2rem;
+  }
+  .overlay .ts {
+    font-size: 0.65rem; color: rgba(255,255,255,0.45);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.45); margin-top: 0.3rem;
+  }
+  #loading {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(to bottom, #7aa0be 0%, #b8ccda 55%, #cdd6d8 100%);
+    color: rgba(255,255,255,0.7); font-size: 0.85rem; letter-spacing: 0.1em;
+    z-index: 20; transition: opacity 0.7s;
+  }
+  #loading.hidden { opacity: 0; pointer-events: none; }
+
+  /* ---- Solar time slider ---- */
+  #solar-ui {
+    position: fixed; bottom: 1.8rem; left: 50%; transform: translateX(-50%);
+    z-index: 10;
+    display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
+    padding: 0.65rem 1.4rem 0.7rem;
+    background: rgba(0,0,0,0.28); border-radius: 2rem;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    user-select: none;
+  }
+  #solar-row {
+    display: flex; align-items: center; gap: 0.7rem;
+  }
+  #solar-time {
+    font-size: 1rem; font-weight: 600; color: #fff;
+    letter-spacing: 0.06em; text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    min-width: 3.2rem; text-align: center;
+  }
+  #solar-label {
+    font-size: 0.6rem; color: rgba(255,255,255,0.5);
+    letter-spacing: 0.09em; text-transform: uppercase;
+  }
+  #solar-slider {
+    width: 240px;
+    -webkit-appearance: none; appearance: none;
+    height: 3px; border-radius: 2px;
+    background: rgba(255,255,255,0.28); outline: none; cursor: pointer;
+  }
+  #solar-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.45); cursor: grab;
+  }
+  #solar-slider::-webkit-slider-thumb:active { cursor: grabbing; }
+  #solar-slider::-moz-range-thumb {
+    width: 15px; height: 15px; border: none; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.45); cursor: grab;
+  }
+</style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div class="overlay">
+    <!-- TODO: update title and subtitle for your project -->
+    <h1 id="overlay-title">My Project</h1>
+    <p class="subtitle" id="overlay-subtitle">Interactive 3D model</p>
+    <p class="ts" id="ts"></p>
+  </div>
+
+  <div id="loading">LOADING MODEL …</div>
+
+  <div id="solar-ui">
+    <div id="solar-row">
+      <!-- TODO: update label (e.g. "Stockholm, 21 June") -->
+      <span id="solar-label">June 21</span>
+      <span id="solar-time">14:00</span>
+    </div>
+    <!-- TODO: set min/max to local sunrise/sunset times (hours as float) -->
+    <input type="range" id="solar-slider" min="4.5" max="22.5" step="0.25" value="14">
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three":          "https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.module.js",
+      "three/addons/":  "https://cdn.jsdelivr.net/npm/three@0.172.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE                from 'three';
+    import { GLTFLoader }            from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls }         from 'three/addons/controls/OrbitControls.js';
+    import { RGBELoader }            from 'three/addons/loaders/RGBELoader.js';
+
+    // =========================================================================
+    // PROJECT CONFIGURATION — update these values for each project
+    // =========================================================================
+    const CONFIG = {
+      // UI strings (update title/subtitle in HTML above too)
+      title:    'My Project',
+      subtitle: 'Interactive 3D model',
+      // TODO: set label shown next to the time slider
+      solarLabel: 'June 21',
+
+      // Solar position — site coordinates
+      // TODO: set to the actual lat/lon of the real site
+      latitude:  59.334,   // degrees N (positive = North)
+      longitude: 18.063,   // degrees E (positive = East)
+      tzOffset:  2,        // UTC offset in hours (positive = East of UTC; use summer time)
+
+      // Date for sun trajectory (typically summer or winter solstice for best effect)
+      // TODO: set month/day appropriate for your location and season
+      // year: any year works — the sun's June 21 path varies <0.5 deg between years
+      year:  new Date().getFullYear(),
+      month: 6,            // 1-12
+      day:   21,
+
+      // Slider range (local hours as float, e.g. 4.5 = 04:30)
+      // TODO: adjust to local sunrise/sunset for your lat/date
+      sliderMin:     4.5,
+      sliderMax:    22.5,
+      sliderDefault: 14.0,  // time shown on load
+
+      // Model orientation offset (degrees, calibrated empirically)
+      // The scene's North axis (-Z in Three.js) may not point to geographic North.
+      // See SKILL.md Step 6 for calibration procedure.
+      // Positive = rotate sun clockwise; negative = counterclockwise.
+      modelNorthOffset: 0,
+
+      // HDR environment map path (equirectangular .hdr file)
+      hdrPath: 'assets/sky.hdr',
+
+      // Locale for the export timestamp (e.g. 'en-US', 'sv-SE', 'de-DE')
+      locale: 'en-US',
+      renderedAtLabel: 'Rendered',   // prefix text before the date
+    };
+    // =========================================================================
+
+    // Apply config to DOM
+    document.getElementById('solar-label').textContent = CONFIG.solarLabel;
+    document.getElementById('solar-slider').min     = CONFIG.sliderMin;
+    document.getElementById('solar-slider').max     = CONFIG.sliderMax;
+    document.getElementById('solar-slider').value   = CONFIG.sliderDefault;
+    document.getElementById('solar-time').textContent = formatHour(CONFIG.sliderDefault);
+
+    // -------------------------------------------------------------------------
+    // Renderer
+    // -------------------------------------------------------------------------
+    const canvas = document.getElementById('canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+    renderer.toneMapping       = THREE.NeutralToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.outputColorSpace  = THREE.SRGBColorSpace;
+
+    // -------------------------------------------------------------------------
+    // Scene & camera
+    // -------------------------------------------------------------------------
+    const scene  = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(
+      42, window.innerWidth / window.innerHeight, 0.1, 600
+    );
+    // TODO (Step 7): After calibration, replace with your extracted camera position.
+    // This value is only used AFTER you complete Step 7 (delete the auto-fit block
+    // in the model-load callback below). Until then, the auto-fit sets the view.
+    camera.position.set(20, 15, 24);
+
+    // -------------------------------------------------------------------------
+    // Controls
+    // -------------------------------------------------------------------------
+    const controls = new OrbitControls(camera, renderer.domElement);
+    // Controls target is set by the auto-fit block in the model-load callback.
+    // TODO (Step 7): After calibration, BOTH (a) replace this value with your
+    // extracted target AND (b) delete the auto-fit block in the load callback.
+    // Only then will this hardcoded value take effect on every page load.
+    controls.target.set(0, 3, 0);
+    controls.enableDamping   = true;
+    controls.dampingFactor   = 0.06;
+    controls.minPolarAngle   = 0;
+    controls.maxPolarAngle   = Math.PI * 0.495;  // ~89 deg -- never below the horizon
+    controls.minDistance     = 5;
+    controls.maxDistance     = 130;
+    controls.autoRotate      = false;
+    controls.autoRotateSpeed = 0.35;
+    controls.update();
+
+    let rotateTimer = setTimeout(() => { controls.autoRotate = true; }, 60000);
+    controls.addEventListener('start', () => {
+      controls.autoRotate = false;
+      clearTimeout(rotateTimer);
+    });
+    controls.addEventListener('end', () => {
+      rotateTimer = setTimeout(() => { controls.autoRotate = true; }, 60000);
+    });
+
+    // -------------------------------------------------------------------------
+    // Lighting
+    // -------------------------------------------------------------------------
+    const hemi = new THREE.HemisphereLight(
+      0xc8dff0,   // sky: soft blue-white
+      0x806050,   // ground: warm brown bounce
+      0.85
+    );
+    scene.add(hemi);
+
+    const sun = new THREE.DirectionalLight(0xfff8e8, 3.2);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.radius      = 3;
+    sun.shadow.blurSamples = 8;
+    sun.shadow.bias        = -0.001;
+    sun.shadow.camera.near   = 0.5;
+    sun.shadow.camera.far    = 150;
+    sun.shadow.camera.left   = -30;
+    sun.shadow.camera.right  =  30;
+    sun.shadow.camera.top    =  30;
+    sun.shadow.camera.bottom = -30;
+    scene.add(sun);
+    scene.add(sun.target);   // required for custom target position
+
+    // Visible sun sphere — useful during calibration; remove if not wanted
+    const sunSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(1.2, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffee00 })
+    );
+    scene.add(sunSphere);
+
+    // Shadow-catcher ground plane
+    const shadowCatcher = new THREE.Mesh(
+      new THREE.PlaneGeometry(400, 400).rotateX(-Math.PI / 2),
+      new THREE.ShadowMaterial({ opacity: 0.3, transparent: true })
+    );
+    shadowCatcher.receiveShadow = true;
+    shadowCatcher.castShadow    = false;
+    scene.add(shadowCatcher);
+
+    // -------------------------------------------------------------------------
+    // HDR Environment (IBL)
+    // -------------------------------------------------------------------------
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+    new RGBELoader().load(CONFIG.hdrPath, (hdrTex) => {
+      const envMap = pmrem.fromEquirectangular(hdrTex).texture;
+      scene.environment = envMap;
+      hdrTex.dispose();
+      pmrem.dispose();
+    });
+
+    // -------------------------------------------------------------------------
+    // Solar position -- NOAA simplified algorithm
+    // Reference: https://gml.noaa.gov/grad/solcalc/main.js
+    // -------------------------------------------------------------------------
+
+    function julianDay(year, month, day, hourUTC) {
+      if (month <= 2) { year -= 1; month += 12; }
+      const A = Math.floor(year / 100);
+      const B = 2 - A + Math.floor(A / 4);
+      return Math.floor(365.25 * (year + 4716))
+           + Math.floor(30.6001 * (month + 1))
+           + day + B - 1524.5 + hourUTC / 24;
+    }
+
+    function solarPosition(lat, lon, year, month, day, localHour, tzOffset) {
+      const hourUTC = localHour - tzOffset;
+      const JD = julianDay(year, month, day, hourUTC);
+      const T  = (JD - 2451545.0) / 36525.0;
+
+      // Mean longitude and anomaly (degrees)
+      let L0 = (280.46646 + T * (36000.76983 + T * 0.0003032)) % 360;
+      if (L0 < 0) L0 += 360;
+      let M = (357.52911 + T * (35999.05029 - T * 0.0001537)) % 360;
+      if (M < 0) M += 360;
+      const Mr = M * Math.PI / 180;
+
+      // Equation of center
+      const C = (1.914602 - T * (0.004817 + 0.000014 * T)) * Math.sin(Mr)
+              + (0.019993 - 0.000101 * T) * Math.sin(2 * Mr)
+              + 0.000289 * Math.sin(3 * Mr);
+
+      // Apparent longitude
+      const Omega  = 125.04 - 1934.136 * T;
+      const lambda = (L0 + C) - 0.00569 - 0.00478 * Math.sin(Omega * Math.PI / 180);
+
+      // Obliquity
+      const eps0 = 23.0 + 26.0 / 60.0 + 21.448 / 3600.0
+                 - T * (46.8150 / 3600.0 + T * (0.00059 / 3600.0 - T * 0.001813 / 3600.0));
+      const eps  = eps0 + 0.00256 * Math.cos(Omega * Math.PI / 180);
+      const epsR = eps * Math.PI / 180;
+      const lamR = lambda * Math.PI / 180;
+
+      // Declination
+      const decl = Math.asin(Math.sin(epsR) * Math.sin(lamR));
+
+      // Equation of time (minutes)
+      const L0r = L0 * Math.PI / 180;
+      const y   = Math.tan(epsR / 2) ** 2;
+      const e   = 0.016708634;
+      const EqT = 4 * (180 / Math.PI) * (
+           y * Math.sin(2 * L0r)
+        - 2 * e * Math.sin(Mr)
+        + 4 * e * y * Math.sin(Mr) * Math.cos(2 * L0r)
+        - 0.5 * y * y * Math.sin(4 * L0r)
+        - 1.25 * e * e * Math.sin(2 * Mr)
+      );
+
+      // True solar time (minutes), hour angle
+      const TST = ((hourUTC * 60) + (lon / 15) * 60 + EqT) % 1440;
+      let HA = TST / 4 - 180;
+      if (HA < -180) HA += 360;
+
+      // Elevation
+      const latR = lat * Math.PI / 180;
+      const HAr  = HA  * Math.PI / 180;
+      const cosZ = Math.sin(latR) * Math.sin(decl)
+                 + Math.cos(latR) * Math.cos(decl) * Math.cos(HAr);
+      const zenR = Math.acos(Math.max(-1, Math.min(1, cosZ)));
+      const elevDeg = 90 - zenR * 180 / Math.PI;
+
+      // Azimuth (from North, clockwise) -- NOAA reference formula: az = 180 - acos(cAz)
+      const sinZ = Math.sin(zenR);
+      let az = 0;
+      if (sinZ > 1e-9) {
+        let cAz = (Math.sin(latR) * cosZ - Math.sin(decl)) / (Math.cos(latR) * sinZ);
+        cAz = Math.max(-1, Math.min(1, cAz));
+        az  = 180 - Math.acos(cAz) * 180 / Math.PI;
+        if (HA > 0) az = -az;
+        if (az < 0) az += 360;
+      }
+
+      return { azimuth: az, elevation: elevDeg };
+    }
+    // Expose for browser-console calibration (see SKILL.md Step 6):
+    //   solarPos(lat, lon, year, month, day, hour, tzOffset).azimuth
+    window.solarPos = solarPosition;
+
+    // -------------------------------------------------------------------------
+    // Sky gradient -- smoothly transitions day -> golden hour -> night
+    // -------------------------------------------------------------------------
+    function lerpHex(a, b, t) {
+      const ca = [parseInt(a.slice(1,3),16), parseInt(a.slice(3,5),16), parseInt(a.slice(5,7),16)];
+      const cb = [parseInt(b.slice(1,3),16), parseInt(b.slice(3,5),16), parseInt(b.slice(5,7),16)];
+      const r  = Math.round(ca[0] + (cb[0] - ca[0]) * t);
+      const g  = Math.round(ca[1] + (cb[1] - ca[1]) * t);
+      const bl = Math.round(ca[2] + (cb[2] - ca[2]) * t);
+      return `rgb(${r},${g},${bl})`;
+    }
+
+    const skyPalette = {
+      //           top        mid        bot
+      day:   ['#7aa0be', '#b8ccda', '#cdd6d8'],
+      dawn:  ['#d96c20', '#c48848', '#b89868'],
+      night: ['#0d1828', '#1a2d44', '#263040'],
+    };
+
+    function updateSkyGradient(elDeg) {
+      let top, mid, bot;
+      const [dt, dm, db] = skyPalette.day;
+      const [wt, wm, wb] = skyPalette.dawn;
+      const [nt, nm, nb] = skyPalette.night;
+
+      if (elDeg >= 14) {
+        [top, mid, bot] = [dt, dm, db];
+      } else if (elDeg >= 5) {
+        const t = (elDeg - 5) / 9;
+        top = lerpHex(wt, dt, t); mid = lerpHex(wm, dm, t); bot = lerpHex(wb, db, t);
+      } else if (elDeg >= -3) {
+        const t = (elDeg + 3) / 8;
+        top = lerpHex(nt, wt, t); mid = lerpHex(nm, wm, t); bot = lerpHex(nb, wb, t);
+      } else {
+        [top, mid, bot] = [nt, nm, nb];
+      }
+      canvas.style.background =
+        `linear-gradient(to bottom, ${top} 0%, ${mid} 55%, ${bot} 100%)`;
+    }
+
+    // -------------------------------------------------------------------------
+    // Update sun light from local hour (float)
+    // -------------------------------------------------------------------------
+    let modelSphere = null;   // set after model loads
+
+    function updateSun(localHour) {
+      const { azimuth, elevation } =
+        solarPosition(
+          CONFIG.latitude, CONFIG.longitude,
+          CONFIG.year, CONFIG.month, CONFIG.day,
+          localHour, CONFIG.tzOffset
+        );
+      // Apply model orientation offset.
+      // Three.js coordinate system after FreeCAD glTF export: North=-Z, East=+X, Up=+Y
+      const azR  = ((azimuth - CONFIG.modelNorthOffset) + 360) % 360 * Math.PI / 180;
+      const elR  = elevation * Math.PI / 180;
+      const cosEl = Math.cos(elR);
+      const sinEl = Math.sin(elR);
+
+      sun.position.set(
+         Math.sin(azR) * cosEl,
+         sinEl,
+        -Math.cos(azR) * cosEl
+      ).multiplyScalar(50);
+      sunSphere.position.copy(sun.position);
+
+      // Fit shadow camera frustum to model bounding sphere (angle-independent)
+      if (modelSphere) {
+        const r  = modelSphere.radius + 8;
+        const sc = sun.shadow.camera;
+        sc.left   = -r;  sc.right  =  r;
+        sc.top    =  r;  sc.bottom = -r;
+        sc.near   = Math.max(0.5, 50 - modelSphere.radius - 5);
+        sc.far    = 50 + modelSphere.radius + 20;
+        sc.updateProjectionMatrix();
+      }
+
+      // Sun color: warm at low elevation, neutral at noon
+      const tColor = Math.max(0, Math.min(1, (elevation - 5) / 20));
+      sun.color.setRGB(1.0, 0.85 + 0.15 * tColor, 0.5 + 0.44 * tColor);
+
+      // Intensity: smooth ramp from horizon; full brightness above 15 deg
+      const elNorm = Math.max(0, sinEl);
+      sun.intensity = 3.2 * Math.pow(elNorm, 0.5);
+
+      // Hemisphere: warmer sky at low sun; more ambient fill when sun is down
+      hemi.intensity = elevation < 0 ? 1.1 : 0.6 + 0.5 * elNorm;
+      const warm = Math.max(0, Math.min(1, 1 - (elevation - 2) / 12));
+      hemi.color.setRGB(0.78 + 0.22 * (1 - warm), 0.78 + 0.09 * (1 - warm), 0.94 - 0.44 * warm);
+
+      // Sky gradient
+      updateSkyGradient(elevation);
+
+      // Shadow catcher opacity: subtle at night
+      shadowCatcher.material.opacity = elevation > 0 ? 0.30 : 0.05;
+    }
+
+    // -------------------------------------------------------------------------
+    // Solar slider UI
+    // -------------------------------------------------------------------------
+    function formatHour(h) {
+      const hh = Math.floor(h);
+      const mm = Math.round((h - hh) * 60);
+      return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+    }
+
+    const slider  = document.getElementById('solar-slider');
+    const timeEl  = document.getElementById('solar-time');
+
+    slider.addEventListener('input', () => {
+      const h = parseFloat(slider.value);
+      timeEl.textContent = formatHour(h);
+      updateSun(h);
+    });
+
+    // -------------------------------------------------------------------------
+    // Load model
+    // -------------------------------------------------------------------------
+    async function findModelSrc() {
+      const p = new URLSearchParams(location.search).get('model');
+      if (p) return `exports/${p}`;
+      // Try common names; the export script uses <document_name>.gltf by default
+      for (const name of ['model.gltf', 'model.glb', 'scene.gltf', 'scene.glb']) {
+        try { const r = await fetch(`exports/${name}`, { method: 'HEAD' }); if (r.ok) return `exports/${name}`; }
+        catch {}
+      }
+      // Fallback: look for any .gltf in exports/ via export-info.json
+      try {
+        const info = await fetch('exports/export-info.json').then(r => r.json());
+        if (info.model) return `exports/${info.model}`;
+      } catch {}
+      return null;
+    }
+
+    const loadingEl = document.getElementById('loading');
+
+    findModelSrc().then(src => {
+      if (!src) { loadingEl.textContent = 'NO MODEL FOUND'; return; }
+
+      new GLTFLoader().load(src, (gltf) => {
+
+        gltf.scene.traverse(node => {
+          if (!node.isMesh) return;
+          node.castShadow    = true;
+          node.receiveShadow = true;
+          if (node.material?.isMeshStandardMaterial) {
+            node.material.roughness = Math.min(node.material.roughness, 0.88);
+          }
+        });
+
+        scene.add(gltf.scene);
+
+        // Compute bounding sphere for shadow camera fitting
+        const box = new THREE.Box3().setFromObject(gltf.scene);
+        modelSphere = new THREE.Sphere();
+        box.getBoundingSphere(modelSphere);
+
+        // Point sun target at model center
+        sun.target.position.copy(modelSphere.center);
+        sun.target.updateMatrixWorld();
+
+        // Align shadow catcher with model floor
+        shadowCatcher.position.y = box.min.y;
+
+        // Re-apply current slider value now that we have model bounds
+        updateSun(parseFloat(slider.value));
+
+        // Auto-fit camera to model on first load.
+        // TODO (Step 7): after calibration, replace the two lines below with
+        // hardcoded values and remove this whole block.
+        const size = box.getSize(new THREE.Vector3());
+        controls.target.set(
+          modelSphere.center.x,
+          box.min.y + size.y * 0.3,
+          modelSphere.center.z
+        );
+        controls.update();
+
+        loadingEl.classList.add('hidden');
+        setTimeout(() => loadingEl.remove(), 800);
+
+      }, undefined, err => {
+        console.error(err);
+        loadingEl.textContent = 'ERROR LOADING MODEL';
+      });
+    });
+
+    // Initialize sun at default hour (before model loads, for initial render)
+    updateSun(CONFIG.sliderDefault);
+
+    // -------------------------------------------------------------------------
+    // Export timestamp
+    // -------------------------------------------------------------------------
+    (async () => {
+      try {
+        const info = await fetch('exports/export-info.json').then(r => r.json());
+        if (info.exported_at) {
+          const d = new Date(info.exported_at);
+          document.getElementById('ts').textContent =
+            CONFIG.renderedAtLabel + ' ' +
+            d.toLocaleDateString(CONFIG.locale, {
+              year: 'numeric', month: 'long', day: 'numeric'
+            }) + ' ' + d.toLocaleTimeString(CONFIG.locale, {
+              hour: '2-digit', minute: '2-digit'
+            });
+        }
+      } catch {}
+    })();
+
+    // -------------------------------------------------------------------------
+    // Resize
+    // -------------------------------------------------------------------------
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // -------------------------------------------------------------------------
+    // Render loop
+    // -------------------------------------------------------------------------
+    const clock = new THREE.Clock();
+    (function animate() {
+      requestAnimationFrame(animate);
+      controls.update(clock.getDelta());
+      renderer.render(scene, camera);
+    })();
+
+  </script>
+</body>
+</html>
