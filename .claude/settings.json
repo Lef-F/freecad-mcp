@@ -42,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/auto-save.py"
+            "command": "python3 $(git rev-parse --show-toplevel)/.claude/hooks/auto-save.py"
           }
         ]
       }
