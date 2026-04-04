@@ -50,6 +50,7 @@
 ## Version Compatibility
 
 - Use `hasattr(App, "TypeName")` guards before `isinstance(value, App.TypeName)` checks for types that may not exist in all FreeCAD versions
-- Test against FreeCAD 1.0.2 as the baseline (some types like `App.Color` are missing)
+- Test against FreeCAD 1.1.0 as the baseline (some types like `App.Color` are still missing)
 - Document new version requirements in `.claude/context/known-issues.md`
 - Serialization must never crash — unhandled types fall back to `str()`
+- Draft Wire/BSpline/BezCurve TypeId changed to `Part::FeaturePython` in FreeCAD 1.1 — don't rely on old `Draft::Wire` TypeId for filtering

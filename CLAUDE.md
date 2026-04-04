@@ -68,7 +68,7 @@ Every object in a FreeCAD document gets an `App::PropertyEnumeration` called `MC
 
 ### Known Limitations
 
-- **`FreeCAD.Color` missing in FreeCAD 1.0.2**: The `App.Color` class doesn't exist in older releases. `serialize.py` guards this with `hasattr(App, "Color")` to avoid `AttributeError` crashes in `get_objects`/`get_object`.
+- **`FreeCAD.Color` missing in FreeCAD 1.0.2–1.1.0**: The `App.Color` class doesn't exist in these releases. `serialize.py` guards this with `hasattr(App, "Color")` to avoid `AttributeError` crashes in `get_objects`/`get_object`.
 - **Screenshot size overflow**: On high-DPI displays, default viewport screenshots can exceed 300KB. Always pass explicit `width`/`height` to `get_view`.
 - **Parts library dependency**: `get_parts_list` and `insert_part_from_library` require the optional [FreeCAD Parts Library addon](https://github.com/FreeCAD/FreeCAD-library). They return empty/error responses if it's not installed.
 - **Serialization fragility**: Unhandled FreeCAD types in `serialize_value()` fall back to `str()`. If `serialize_object()` itself raises, `get_objects`/`get_object` return `{"success": false, "error": ...}` instead of crashing.
@@ -128,7 +128,7 @@ for w in walls:
 - `uv` package manager
 - FreeCAD installed locally
 
-> **Note:** FreeCAD bundles its **own Python 3.11** interpreter (verified: 3.11.13 in FreeCAD 1.0.2 on macOS).
+> **Note:** FreeCAD bundles its **own Python 3.11** interpreter (verified: 3.11.14 in FreeCAD 1.1.0 on macOS).
 > Addon code in `addon/` runs under Python 3.11 — do not use Python 3.12+ syntax there.
 > See `.claude/context/known-issues.md` for how to verify the version locally on any platform.
 
@@ -137,8 +137,10 @@ This is how you "deploy" the addon locally — copy `addon/FreeCADMCP` into Free
 Run this after every change to addon code to pick up changes in FreeCAD (requires FreeCAD restart).
 
 ```bash
-# macOS (confirmed path):
-cp -r addon/FreeCADMCP ~/Library/Application\ Support/FreeCAD/Mod/
+# macOS — FreeCAD 1.1+ uses versioned directories:
+cp -r addon/FreeCADMCP ~/Library/Application\ Support/FreeCAD/v1-1/Mod/
+# macOS — FreeCAD 1.0.x (unversioned):
+# cp -r addon/FreeCADMCP ~/Library/Application\ Support/FreeCAD/Mod/
 
 # Linux:
 cp -r addon/FreeCADMCP ~/.local/share/FreeCAD/Mod/   # or ~/.FreeCAD/Mod/
@@ -150,9 +152,12 @@ cp -r addon/FreeCADMCP ~/snap/freecad/common/Mod/
 # xcopy /E /I addon\FreeCADMCP %APPDATA%\FreeCAD\Mod\FreeCADMCP
 ```
 
+> **Note:** FreeCAD 1.1+ uses versioned user data directories (e.g., `v1-1/`). Check
+> `FreeCAD.getUserAppDataDir()` in the FreeCAD Python console to find the correct path.
+
 Verify the copy is in sync (only `__pycache__` should differ):
 ```bash
-diff -r addon/FreeCADMCP ~/Library/Application\ Support/FreeCAD/Mod/FreeCADMCP
+diff -r addon/FreeCADMCP ~/Library/Application\ Support/FreeCAD/v1-1/Mod/FreeCADMCP
 ```
 
 ### Claude Desktop config (local dev)
@@ -285,7 +290,7 @@ See `.claude/context/tool-lifecycle.md` for the full step-by-step guide with cod
 
 | Problem | Cause | Fix |
 |---------|-------|-----|
-| `AttributeError: module 'FreeCAD' has no attribute 'Color'` | FreeCAD 1.0.2 lacks `App.Color` | Fixed: `serialize.py` uses `hasattr(App, "Color")` guard |
+| `AttributeError: module 'FreeCAD' has no attribute 'Color'` | FreeCAD 1.0.2–1.1.0 lack `App.Color` | Fixed: `serialize.py` uses `hasattr(App, "Color")` guard |
 | Screenshot >300KB / token overflow | High-DPI viewport used as default size | Pass explicit `width`/`height` (200–400px) to `get_view` |
 | `get_parts_list` returns empty | Parts Library addon not installed | Install the FreeCAD Parts Library addon |
 | `get_objects` returns raw XML-RPC fault | Unhandled serialization error | Fixed: `get_objects`/`get_object` wrap errors in `{"success": false}` |

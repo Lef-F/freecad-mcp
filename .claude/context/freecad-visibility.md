@@ -20,9 +20,10 @@ These types exist in every FreeCAD document but should never be visible in the 3
 
 | TypeId | Examples | Why hidden |
 |--------|----------|------------|
-| `App::Origin` | `Origin`, `Origin001`, … | Container auto-created for every App::Part and PartDesign::Body. Holds 6 child feature objects. |
+| `App::Origin` | `Origin`, `Origin001`, … | Container auto-created for every App::Part and PartDesign::Body. Holds 6 child feature objects (7 in FreeCAD 1.1+). |
 | `App::Line` | `X_Axis`, `Y_Axis001`, `Z_Axis012`, … | The 3 axis lines inside each App::Origin (one per container, 3 axes each). |
 | `App::Plane` | `XY_Plane`, `XZ_Plane003`, `YZ_Plane012`, … | The 3 planes inside each App::Origin (one per container, 3 planes each). |
+| `App::Point` | `Origin001`, … | Origin point added in FreeCAD 1.1+ (one per container). |
 | `PartDesign::SubShapeBinder` | `Binder`, `Binder004`, `Binder016`, … | Shape reference inputs to PartDesign operations — internal plumbing |
 | `PartDesign::Pad` | `Pad011`, `Pad029`, … | Intermediate PartDesign steps inside a Body |
 | `PartDesign::Pocket` | `Pocket009`, `Pocket036`, … | Intermediate PartDesign steps |
@@ -69,7 +70,7 @@ Run this query to find visible objects whose TypeId should be hidden:
 doc = FreeCAD.ActiveDocument
 
 always_hidden_types = {
-    "App::Origin", "App::Line", "App::Plane", "App::OriginFeature",
+    "App::Origin", "App::Line", "App::Plane", "App::Point", "App::OriginFeature",
     "TechDraw::DrawPage",   # ⚠️ CRASH RISK — do not set Visibility on these
     "TechDraw::DrawViewPart", "TechDraw::DrawViewSection", "TechDraw::DrawViewDetail",
     "TechDraw::DrawHatch", "TechDraw::DrawViewDimension", "TechDraw::DrawSVGTemplate",
@@ -114,7 +115,7 @@ doc = FreeCAD.ActiveDocument
 
 always_hidden_types = {
     # Origins (MUST hide — 100+ in large docs)
-    "App::Origin", "App::Line", "App::Plane", "App::OriginFeature",
+    "App::Origin", "App::Line", "App::Plane", "App::Point", "App::OriginFeature",
     # TechDraw — DrawPage CRASHES FreeCAD if set visible in a loop; hide entire family
     "TechDraw::DrawPage",
     "TechDraw::DrawViewPart", "TechDraw::DrawViewSection", "TechDraw::DrawViewDetail",
@@ -388,7 +389,7 @@ for name in top_level_hide:
         obj.ViewObject.Visibility = False
 
 # ── Step 3: Clean up any noise types that might have leaked ──
-noise = {"App::Origin", "App::Line", "App::Plane",
+noise = {"App::Origin", "App::Line", "App::Plane", "App::Point",
          "TechDraw::DrawPage",    # ⚠️ NEVER set these True
          "TechDraw::DrawViewPart", "TechDraw::DrawViewSection",
          "Sketcher::SketchObject", "Image::ImagePlane"}

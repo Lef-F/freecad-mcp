@@ -29,7 +29,7 @@ Every object in a FreeCAD document gets an `App::PropertyEnumeration` called `MC
 | Part::FeaturePython (Array, Pipe) | `Final` or per user | Display objects |
 | App::DocumentObjectGroup | Matches dominant child role | Informational — visibility is derived, not driven by tag |
 | App::Part | Matches dominant child role | Same as groups |
-| App::Origin, App::Line, App::Plane | `Intermediate` | Always. Noise. |
+| App::Origin, App::Line, App::Plane, App::Point | `Intermediate` | Always. Noise. |
 | Sketcher::SketchObject (root-level) | `Intermediate` | Construction geometry |
 | TechDraw::* | `Intermediate` | Never touch visibility on these |
 | Image::ImagePlane | `Intermediate` | Reference images |

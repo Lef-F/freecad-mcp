@@ -8,18 +8,21 @@ Source-verified findings from `/vendor/FreeCAD/src/App/` and `/vendor/FreeCAD/sr
 
 Every `App::Part` and `PartDesign::Body` **automatically** gets an `App::Origin` child. Never create one manually.
 
-The origin provides a local coordinate frame with six child objects:
+The origin provides a local coordinate frame with child objects:
 
-| Index | TypeId | Role | Description |
-|-------|--------|------|-------------|
-| 0 | `App::Line` | `X_Axis` | Local X axis |
-| 1 | `App::Line` | `Y_Axis` | Local Y axis |
-| 2 | `App::Line` | `Z_Axis` | Local Z axis |
-| 3 | `App::Plane` | `XY_Plane` | Local XY plane |
-| 4 | `App::Plane` | `XZ_Plane` | Local XZ plane |
-| 5 | `App::Plane` | `YZ_Plane` | Local YZ plane |
+| Index | TypeId | Role | Description | Since |
+|-------|--------|------|-------------|-------|
+| 0 | `App::Line` | `X_Axis` | Local X axis | 1.0 |
+| 1 | `App::Line` | `Y_Axis` | Local Y axis | 1.0 |
+| 2 | `App::Line` | `Z_Axis` | Local Z axis | 1.0 |
+| 3 | `App::Plane` | `XY_Plane` | Local XY plane | 1.0 |
+| 4 | `App::Plane` | `XZ_Plane` | Local XZ plane | 1.0 |
+| 5 | `App::Plane` | `YZ_Plane` | Local YZ plane | 1.0 |
+| 6 | `App::Point` | `Origin` | Local origin point | 1.1 |
 
 Access via `container.Origin.OriginFeatures[i]` — the index order above is guaranteed by the source.
+
+> **FreeCAD 1.1 change**: OriginFeatures now has 7 items (was 6). Indices 0–5 are unchanged. The new `App::Point` at index 6 is part of the PartDesign origin datums rewrite (PR #18126). Files referencing origin datums may be auto-converted on open; converted files are NOT backward-compatible with 1.0.x.
 
 **Inheritance chain** (from FreeCAD source):
 ```
@@ -53,12 +56,13 @@ This means: if you give a Part a 45° rotation around Z, a child box placed at l
 body = doc.getObject("MyBody")     # App::Part or PartDesign::Body
 origin = body.Origin               # App::Origin container
 
-x_axis   = origin.OriginFeatures[0]
-y_axis   = origin.OriginFeatures[1]
-z_axis   = origin.OriginFeatures[2]
-xy_plane = origin.OriginFeatures[3]
-xz_plane = origin.OriginFeatures[4]
-yz_plane = origin.OriginFeatures[5]
+x_axis    = origin.OriginFeatures[0]
+y_axis    = origin.OriginFeatures[1]
+z_axis    = origin.OriginFeatures[2]
+xy_plane  = origin.OriginFeatures[3]
+xz_plane  = origin.OriginFeatures[4]
+yz_plane  = origin.OriginFeatures[5]
+origin_pt = origin.OriginFeatures[6]  # FreeCAD 1.1+ only
 ```
 
 ### Attaching a sketch to a body's local plane
@@ -111,4 +115,4 @@ doc.recompute()
 
 ## Visibility
 
-`App::Origin`, `App::Line`, and `App::Plane` should almost never be visible. A document with 30 Part/Body containers has **210 origin objects** (30 × 7 each). See `freecad-visibility.md` for the canonical noise filter, cleanup scripts, and the full always-hidden type list.
+`App::Origin`, `App::Line`, `App::Plane`, and `App::Point` should almost never be visible. A document with 30 Part/Body containers has **210 origin objects** in FreeCAD 1.0 (30 x 7) or **240** in 1.1+ (30 x 8). See `freecad-visibility.md` for the canonical noise filter, cleanup scripts, and the full always-hidden type list.
