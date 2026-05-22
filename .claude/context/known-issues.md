@@ -6,11 +6,11 @@ Reference for known bugs, version-specific issues, and workarounds.
 
 ### `FreeCAD.Color` AttributeError
 - **File**: `addon/FreeCADMCP/rpc_server/serialize.py`, line 22
-- **Affected versions**: FreeCAD 1.0.2, 1.1.0 (and possibly other releases)
+- **Affected versions**: FreeCAD 1.0.2, 1.1.0, 1.1.1 (still missing as of 1.1.1)
 - **Symptom**: `get_objects` crashes with `AttributeError: module 'FreeCAD' has no attribute 'Color'`; `get_object` returns `<error: ...>` strings in property values
-- **Root cause**: `isinstance(value, App.Color)` evaluated at call time, but `App.Color` doesn't exist in FreeCAD 1.0.2
+- **Root cause**: `isinstance(value, App.Color)` evaluated at call time, but `App.Color` is not exposed as a Python type (verified in `vendor/FreeCAD/src/Base/` — no `ColorPy` binding through 1.1.1)
 - **Fix**: Guard with `hasattr(App, "Color")` before the `isinstance` check
-- **Impact**: Unblocks `get_objects` and `get_object` on FreeCAD 1.0.2
+- **Impact**: Unblocks `get_objects` and `get_object` across all supported versions
 
 ### Raw XML-RPC Faults from `get_objects`/`get_object`
 - **File**: `addon/FreeCADMCP/rpc_server/rpc_server.py`, lines 308-320
@@ -48,10 +48,10 @@ FreeCAD bundles its **own Python interpreter** — separate from the MCP server'
 | MCP server (`src/`) | 3.12+ (required) | Runs outside FreeCAD; managed by `uv` |
 | FreeCAD addon (`addon/`) | 3.11.x (bundled) | Runs inside FreeCAD's embedded interpreter |
 
-**FreeCAD 1.1.0 (macOS) ships Python 3.11.14** via conda (1.0.2 shipped 3.11.13):
+**FreeCAD 1.1.0 / 1.1.1 (macOS) ships Python 3.11.14** via conda (1.0.2 shipped 3.11.13):
 ```
 /Applications/FreeCAD.app/Contents/Resources/bin/python --version
-# → Python 3.11.14 (FreeCAD 1.1.0)
+# → Python 3.11.14 (FreeCAD 1.1.0 / 1.1.1)
 # → Python 3.11.13 (FreeCAD 1.0.2)
 ```
 
@@ -81,20 +81,20 @@ On **Windows**, check `%LOCALAPPDATA%\Programs\FreeCAD\bin\python.exe --version`
 
 ## FreeCAD Version Compatibility
 
-| Feature | FreeCAD 1.0.2 | FreeCAD 1.1.0 |
-|---------|---------------|---------------|
-| `App.Color` | Not available | Not available |
-| `saveImage()` | Works (3D views only) | Works (3D views only) |
-| `ObjectsFem.make*()` | Available | Available |
-| Parts Library addon | Optional | Optional |
-| Embedded Python | 3.11.13 | 3.11.14 |
-| User data dir | `~/...FreeCAD/` | `~/...FreeCAD/v1-1/` (versioned) |
-| `OriginFeatures` count | 6 (indices 0-5) | 7 (indices 0-6, new `App::Point`) |
-| Draft Wire TypeId | `Draft::Wire` | `Part::FeaturePython` |
-| `Part::Loft`/`Part::Sweep` | Default to shell | Default to solid |
-| `TechDraw_LandmarkDimension` | Available (deprecated) | Removed |
-| `TechDraw_LinkDimension` | Available (deprecated) | Removed |
-| `FreeCAD.ApplicationDirectories` | Not available | Available |
+| Feature | FreeCAD 1.0.2 | FreeCAD 1.1.0 | FreeCAD 1.1.1 |
+|---------|---------------|---------------|---------------|
+| `App.Color` | Not available | Not available | Not available |
+| `saveImage()` | Works (3D views only) | Works (3D views only) | Works (3D views only) |
+| `ObjectsFem.make*()` | Available | Available | Available |
+| Parts Library addon | Optional | Optional | Optional |
+| Embedded Python | 3.11.13 | 3.11.14 | 3.11.14 |
+| User data dir | `~/...FreeCAD/` | `~/...FreeCAD/v1-1/` | `~/...FreeCAD/v1-1/` |
+| `OriginFeatures` count | 6 (indices 0-5) | 7 (indices 0-6, new `App::Point`) | 7 (indices 0-6) |
+| Draft Wire TypeId | `Draft::Wire` | `Part::FeaturePython` | `Part::FeaturePython` |
+| `Part::Loft`/`Part::Sweep` | Default to shell | Default to solid | Default to solid |
+| `TechDraw_LandmarkDimension` | Available (deprecated) | Removed | Removed |
+| `TechDraw_LinkDimension` | Available (deprecated) | Removed | Removed |
+| `FreeCAD.ApplicationDirectories` | Not available | Available | Available |
 
 ### FreeCAD 1.1.0 Breaking Changes
 
@@ -102,6 +102,16 @@ On **Windows**, check `%LOCALAPPDATA%\Programs\FreeCAD\bin\python.exe --version`
 - **Draft Wire/BSpline/BezCurve TypeId changed** to `Part::FeaturePython` (PR #21636). Code filtering by `Draft::Wire` etc. will miss these objects in 1.1.0.
 - **Part Loft/Sweep default to solid** (PR #22098). Scripts expecting shells will get solids instead.
 - **Versioned user data directories**: `getUserAppDataDir()` now returns a versioned path (e.g., `v1-1/`). Addon install paths and settings file locations have moved.
+
+### FreeCAD 1.1.1 (Patch Release, no breaking changes)
+
+Pure bug-fix release on top of 1.1.0. Same user data dir, same Python, no API changes affecting our addon. Notable fixes:
+- **TechDraw**: Fix segfault in `QGIViewPart` during scene destruction; fix crash in area dim for face with nested voids; fix invisible new lines after setting line attributes; symbols restored in dark themes
+- **PartDesign**: Fix Length/Length2 expression migration for TwoLengths pads; fix Remove edge button in Pipe panels
+- **Part**: Boolean failing in part container fixed; respect 'dirty' flag even if no geometry changed
+- **BIM/Arch**: Fix `Arch_Schedule` ignoring units; baseless `ArchComponent` should not lose shape
+- **Security**: Validate module imports in `PropertyPythonObject::Restore()`
+- **Assembly**: Fix recompute joint issue caused by `migrationScript4` failure
 
 ## Visual / UI Gotchas
 

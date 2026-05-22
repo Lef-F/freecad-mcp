@@ -11,7 +11,7 @@ If `vendor/FreeCAD/` does not exist, you can still look things up via GitHub:
 ```
 https://github.com/FreeCAD/FreeCAD/tree/<version>/<path>
 ```
-where `<version>` comes from `.FREECAD_VERSION` (e.g. `1.0.2`).
+where `<version>` comes from `.FREECAD_VERSION` (e.g. `1.1.1`).
 
 ---
 

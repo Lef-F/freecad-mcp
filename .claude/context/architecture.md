@@ -59,7 +59,7 @@ When remote connections are enabled:
 
 ## Compatibility Notes
 
-- **Tested against**: FreeCAD 1.1.0
+- **Tested against**: FreeCAD 1.1.1 (also 1.1.0; 1.0.x best-effort)
 - **API differences**: Some types (e.g., `FreeCAD.Color`) don't exist in all versions. See `.claude/context/known-issues.md` for details.
 - **User data directory**: FreeCAD 1.1+ uses versioned directories (e.g., `~/Library/Application Support/FreeCAD/v1-1/`). Use `FreeCAD.getUserAppDataDir()` to get the correct path.
 - **Serialization safety**: `serialize.py` must use `hasattr` guards before `isinstance` checks on version-dependent types
