@@ -12,6 +12,7 @@ import io
 import os
 import tempfile
 import threading
+import traceback
 from dataclasses import dataclass, field
 from typing import Any
 from xmlrpc.server import SimpleXMLRPCServer
@@ -143,14 +144,38 @@ def _parse_allowed_ips(allowed_ips_str):
 rpc_request_queue = queue.Queue()
 rpc_response_queue = queue.Queue()
 
+# Sentinel posted by stop_rpc_server() so the next process_gui_tasks tick
+# exits cleanly without rescheduling itself — otherwise a subsequent
+# start_rpc_server would leave two QTimer chains running in parallel.
+_DISPATCH_SHUTDOWN = object()
+
 
 def process_gui_tasks():
-    while not rpc_request_queue.empty():
-        task = rpc_request_queue.get()
-        res = task()
-        if res is not None:
-            rpc_response_queue.put(res)
-    QtCore.QTimer.singleShot(500, process_gui_tasks)
+    # Resilience: a handler exception used to propagate out of this function,
+    # skipping the QTimer reschedule at the end. The dispatch loop silently
+    # died, every subsequent RPC call timed out on rpc_response_queue.get(),
+    # and only a FreeCAD restart recovered it. Wrap task() in try/except and
+    # the drain in try/finally so the loop always survives.
+    try:
+        while not rpc_request_queue.empty():
+            task = rpc_request_queue.get()
+            if task is _DISPATCH_SHUTDOWN:
+                return
+            try:
+                res = task()
+            except Exception as e:
+                FreeCAD.Console.PrintError(
+                    f"MCP RPC: GUI task raised {type(e).__name__}: {e}\n"
+                    f"{traceback.format_exc()}"
+                )
+                rpc_response_queue.put(f"{type(e).__name__}: {e}")
+                continue
+            if res is None:
+                rpc_response_queue.put("GUI handler returned None")
+            else:
+                rpc_response_queue.put(res)
+    finally:
+        QtCore.QTimer.singleShot(500, process_gui_tasks)
 
 
 @dataclass
@@ -664,6 +689,10 @@ def stop_rpc_server():
     global rpc_server_instance, rpc_server_thread
 
     if rpc_server_instance:
+        # Post the shutdown sentinel so the next process_gui_tasks tick exits
+        # without rescheduling; otherwise start_rpc_server would leave two
+        # QTimer chains running.
+        rpc_request_queue.put(_DISPATCH_SHUTDOWN)
         rpc_server_instance.shutdown()
         rpc_server_thread.join(timeout=5)
         if rpc_server_thread.is_alive():
