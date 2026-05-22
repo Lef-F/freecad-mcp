@@ -30,13 +30,15 @@ addon/FreeCADMCP/
 ## Key Design Patterns
 
 ### GUI Task Queue (Thread Safety)
-FreeCAD GUI operations must run on the main Qt thread. The addon uses a queue-based pattern:
-- RPC methods put lambdas into `rpc_request_queue`
-- A Qt timer (`process_gui_tasks`, 500ms interval) picks tasks from the queue and executes them on the GUI thread
-- Results are returned via `rpc_response_queue`
-- The RPC thread blocks on `rpc_response_queue.get()` until the GUI thread responds
+FreeCAD GUI operations must run on the main Qt thread. The addon uses a per-call queue pattern via `_dispatch_to_gui(handler, timeout=30)`:
+- Each RPC method calls `_dispatch_to_gui(lambda: self._my_handler(...))`.
+- `_dispatch_to_gui` creates a **private 1-slot response queue** captured in a closure, wraps the handler in a try/except that pushes `("ok", result)` or `("err", exception)` onto that private queue, and puts the wrapper onto the shared `rpc_request_queue`.
+- A Qt timer (`process_gui_tasks`, 500ms interval) drains `rpc_request_queue` on the GUI thread and runs each task. The dispatch loop owns no caller state.
+- The RPC thread blocks on the private queue with a timeout; on `queue.Empty` the caller returns a clean timeout error.
 
-See `rpc_request_queue`, `rpc_response_queue`, and `process_gui_tasks()` in `addon/FreeCADMCP/rpc_server/rpc_server.py`.
+This design eliminates the orphan-cascade bug that the older shared `rpc_response_queue` had: any unpaired event (handler crash, caller timeout, client disconnect) used to leave a stale response that the next caller would grab, desyncing every subsequent call until a restart. With per-call queues, response routing is inseparable from the call itself.
+
+See `_dispatch_to_gui`, `rpc_request_queue`, and `process_gui_tasks()` in `addon/FreeCADMCP/rpc_server/rpc_server.py`.
 
 ### Property Setting
 `set_object_property()` in `rpc_server.py` handles complex type mapping:
@@ -281,10 +283,10 @@ See `.claude/context/tool-lifecycle.md` for the full step-by-step guide with cod
 
 ### Adding a New RPC Method
 1. Add the method to `FreeCADRPC` in `rpc_server.py`
-2. For GUI-thread work: put a lambda into `rpc_request_queue`, wait on `rpc_response_queue`
-3. The `_gui` helper should **return** its result (not put it into the queue) — `process_gui_tasks()` handles the queue
-4. The public method wraps the raw result from the queue into `{"success": bool, ...}` dict
-5. For read-only operations (like `get_objects`): access FreeCAD directly (no queue needed)
+2. For GUI-thread work: call `_dispatch_to_gui(lambda: self._my_method_gui(...))` and wrap it in `try/except (queue.Empty, Exception)` to translate timeouts and unexpected exceptions into clean error dicts.
+3. The `_gui` helper should **return** its result; `_dispatch_to_gui` routes it back through the caller's private queue.
+4. The public method maps the returned value into `{"success": bool, ...}` (True → success, anything else → error string).
+5. For read-only operations (like `get_objects`, `list_documents`): access FreeCAD directly (no queue needed).
 
 ## Troubleshooting
 

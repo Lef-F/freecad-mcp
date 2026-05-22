@@ -35,10 +35,10 @@ FreeCAD Application (Qt main thread)
 FreeCAD's Qt event loop requires GUI operations on the main thread. The addon solves this with:
 
 1. RPC method receives request on background thread
-2. Wraps operation as lambda, puts it in `rpc_request_queue`
-3. `process_gui_tasks()` timer (500ms) picks up tasks on GUI thread
-4. Result returned via `rpc_response_queue`
-5. RPC method unblocks and returns to caller
+2. Calls `_dispatch_to_gui(handler)` which creates a private 1-slot response queue, wraps `handler` to push `("ok", result)` or `("err", exception)`, and puts the wrapper on `rpc_request_queue`
+3. `process_gui_tasks()` timer (500ms) picks up tasks on GUI thread and just calls them — it owns no caller state
+4. Wrapper pushes the result onto the caller's private queue
+5. `_dispatch_to_gui` unblocks, re-raises handler exceptions or returns the value
 
 Read-only operations (e.g., `get_objects`, `get_object`) skip the queue and access FreeCAD directly.
 

@@ -6,20 +6,23 @@ Step-by-step guide for the full lifecycle of an MCP tool.
 
 In `addon/FreeCADMCP/rpc_server/rpc_server.py`, add a method to `FreeCADRPC`.
 
-The public method queues a lambda and wraps the raw result into a response dict:
+The public method dispatches the handler to the GUI thread via `_dispatch_to_gui`, which owns a private response queue per call (no shared response-queue orphans):
 
 ```python
 def my_new_method(self, doc_name, param):
-    rpc_request_queue.put(lambda: self._my_new_method_gui(doc_name, param))
-    res = rpc_response_queue.get()
+    try:
+        res = _dispatch_to_gui(lambda: self._my_new_method_gui(doc_name, param))
+    except queue.Empty:
+        return {"success": False, "error": "GUI task timed out. FreeCAD may be unresponsive."}
+    except Exception as e:
+        return {"success": False, "error": f"{type(e).__name__}: {e}"}
     if res is True:
         return {"success": True, "result": "..."}
     else:
         return {"success": False, "error": res}
 ```
 
-The `_gui` helper **returns** a value — it does NOT put into the queue directly.
-`process_gui_tasks()` handles putting the return value into `rpc_response_queue`:
+The `_gui` helper **returns** a value — `_dispatch_to_gui` captures it and re-raises if the handler itself raised. `process_gui_tasks()` just runs tasks; it owns no caller state.
 
 ```python
 def _my_new_method_gui(self, doc_name, param):

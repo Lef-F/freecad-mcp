@@ -142,12 +142,40 @@ def _parse_allowed_ips(allowed_ips_str):
 
 # GUI task queue
 rpc_request_queue = queue.Queue()
-rpc_response_queue = queue.Queue()
 
 # Sentinel posted by stop_rpc_server() so the next process_gui_tasks tick
 # exits cleanly without rescheduling itself — otherwise a subsequent
 # start_rpc_server would leave two QTimer chains running in parallel.
 _DISPATCH_SHUTDOWN = object()
+
+
+def _dispatch_to_gui(handler, timeout: int = 30):
+    """Schedule handler() on the GUI thread and return its result.
+
+    Each call owns a private 1-slot response queue captured in a closure,
+    so the request and response sides are inseparable. A handler that
+    raises, returns None, times out, or runs slow cannot desync any
+    future caller — there is no shared response queue to leave orphans
+    on. The earlier ``rpc_response_queue`` global was the source of an
+    orphan-cascade bug after the first unpaired event (handler crash,
+    caller timeout, client disconnect).
+
+    Raises ``queue.Empty`` on timeout. Re-raises handler exceptions on
+    the calling thread; the dispatch loop is unaffected.
+    """
+    response_q: queue.Queue = queue.Queue(maxsize=1)
+
+    def wrapped():
+        try:
+            response_q.put(("ok", handler()))
+        except Exception as e:
+            response_q.put(("err", e))
+
+    rpc_request_queue.put(wrapped)
+    status, value = response_q.get(timeout=timeout)
+    if status == "err":
+        raise value
+    return value
 
 
 def _flush_gui_events(delay_ms: int = 50) -> None:
@@ -169,29 +197,26 @@ def _flush_gui_events(delay_ms: int = 50) -> None:
 
 
 def process_gui_tasks():
-    # Resilience: a handler exception used to propagate out of this function,
-    # skipping the QTimer reschedule at the end. The dispatch loop silently
-    # died, every subsequent RPC call timed out on rpc_response_queue.get(),
-    # and only a FreeCAD restart recovered it. Wrap task() in try/except and
-    # the drain in try/finally so the loop always survives.
+    # Each task is self-contained: _dispatch_to_gui wraps the handler so
+    # the result (or exception) lands on the caller's private queue. The
+    # dispatch loop just runs tasks and reschedules; it owns no state
+    # that could leak between callers.
+    #
+    # The outer try/finally guarantees the QTimer reschedule fires even
+    # if a task slipped through without _dispatch_to_gui's wrapping
+    # (defensive — keeps the loop alive across future bugs).
     try:
         while not rpc_request_queue.empty():
             task = rpc_request_queue.get()
             if task is _DISPATCH_SHUTDOWN:
                 return
             try:
-                res = task()
+                task()
             except Exception as e:
                 FreeCAD.Console.PrintError(
                     f"MCP RPC: GUI task raised {type(e).__name__}: {e}\n"
                     f"{traceback.format_exc()}"
                 )
-                rpc_response_queue.put(f"{type(e).__name__}: {e}")
-                continue
-            if res is None:
-                rpc_response_queue.put("GUI handler returned None")
-            else:
-                rpc_response_queue.put(res)
     finally:
         QtCore.QTimer.singleShot(500, process_gui_tasks)
 
@@ -304,11 +329,12 @@ class FreeCADRPC:
         return True
 
     def create_document(self, name="New_Document"):
-        rpc_request_queue.put(lambda: self._create_document_gui(name))
         try:
-            res = rpc_response_queue.get(timeout=30)
+            res = _dispatch_to_gui(lambda: self._create_document_gui(name))
         except queue.Empty:
             return {"success": False, "error": "GUI task timed out. FreeCAD may be unresponsive."}
+        except Exception as e:
+            return {"success": False, "error": f"{type(e).__name__}: {e}"}
         if res is True:
             return {"success": True, "document_name": name}
         else:
@@ -321,11 +347,12 @@ class FreeCADRPC:
             analysis=obj_data.get("Analysis", None),
             properties=obj_data.get("Properties", {}),
         )
-        rpc_request_queue.put(lambda: self._create_object_gui(doc_name, obj))
         try:
-            res = rpc_response_queue.get(timeout=30)
+            res = _dispatch_to_gui(lambda: self._create_object_gui(doc_name, obj))
         except queue.Empty:
             return {"success": False, "error": "GUI task timed out. FreeCAD may be unresponsive."}
+        except Exception as e:
+            return {"success": False, "error": f"{type(e).__name__}: {e}"}
         if res is True:
             return {"success": True, "object_name": obj.name}
         else:
@@ -336,22 +363,24 @@ class FreeCADRPC:
             name=obj_name,
             properties=properties.get("Properties", {}),
         )
-        rpc_request_queue.put(lambda: self._edit_object_gui(doc_name, obj))
         try:
-            res = rpc_response_queue.get(timeout=30)
+            res = _dispatch_to_gui(lambda: self._edit_object_gui(doc_name, obj))
         except queue.Empty:
             return {"success": False, "error": "GUI task timed out. FreeCAD may be unresponsive."}
+        except Exception as e:
+            return {"success": False, "error": f"{type(e).__name__}: {e}"}
         if res is True:
             return {"success": True, "object_name": obj.name}
         else:
             return {"success": False, "error": res}
 
     def delete_object(self, doc_name: str, obj_name: str):
-        rpc_request_queue.put(lambda: self._delete_object_gui(doc_name, obj_name))
         try:
-            res = rpc_response_queue.get(timeout=30)
+            res = _dispatch_to_gui(lambda: self._delete_object_gui(doc_name, obj_name))
         except queue.Empty:
             return {"success": False, "error": "GUI task timed out. FreeCAD may be unresponsive."}
+        except Exception as e:
+            return {"success": False, "error": f"{type(e).__name__}: {e}"}
         if res is True:
             return {"success": True, "object_name": obj_name}
         else:
@@ -371,11 +400,12 @@ class FreeCADRPC:
                 )
                 return f"Error executing Python code: {e}\n"
 
-        rpc_request_queue.put(task)
         try:
-            res = rpc_response_queue.get(timeout=30)
+            res = _dispatch_to_gui(task)
         except queue.Empty:
             return {"success": False, "error": "GUI task timed out. FreeCAD may be unresponsive."}
+        except Exception as e:
+            return {"success": False, "error": f"{type(e).__name__}: {e}"}
         if res is True:
             return {
                 "success": True,
@@ -408,11 +438,12 @@ class FreeCADRPC:
             return {"success": False, "error": f"Document '{doc_name}' not found"}
 
     def insert_part_from_library(self, relative_path):
-        rpc_request_queue.put(lambda: self._insert_part_from_library(relative_path))
         try:
-            res = rpc_response_queue.get(timeout=30)
+            res = _dispatch_to_gui(lambda: self._insert_part_from_library(relative_path))
         except queue.Empty:
             return {"success": False, "error": "GUI task timed out. FreeCAD may be unresponsive."}
+        except Exception as e:
+            return {"success": False, "error": f"{type(e).__name__}: {e}"}
         if res is True:
             return {"success": True, "message": "Part inserted from library."}
         else:
@@ -446,11 +477,13 @@ class FreeCADRPC:
                 FreeCAD.Console.PrintError(f"Error checking view capabilities: {e}\n")
                 return False
                 
-        rpc_request_queue.put(check_view_supports_screenshots)
         try:
-            supports_screenshots = rpc_response_queue.get(timeout=30)
+            supports_screenshots = _dispatch_to_gui(check_view_supports_screenshots)
         except queue.Empty:
             FreeCAD.Console.PrintWarning("Timed out checking screenshot support\n")
+            return None
+        except Exception as e:
+            FreeCAD.Console.PrintWarning(f"Error checking screenshot support: {e}\n")
             return None
 
         if not supports_screenshots:
@@ -460,17 +493,23 @@ class FreeCADRPC:
         # If view supports screenshots, proceed with capture
         fd, tmp_path = tempfile.mkstemp(suffix=".webp")
         os.close(fd)
-        rpc_request_queue.put(
-            lambda: self._save_active_screenshot(tmp_path, view_name, width, height, focus_object, background_color)
-        )
         try:
-            res = rpc_response_queue.get(timeout=30)
+            res = _dispatch_to_gui(
+                lambda: self._save_active_screenshot(tmp_path, view_name, width, height, focus_object, background_color)
+            )
         except queue.Empty:
             try:
                 os.remove(tmp_path)
             except FileNotFoundError:
                 pass
             FreeCAD.Console.PrintWarning("Timed out waiting for screenshot capture\n")
+            return None
+        except Exception as e:
+            try:
+                os.remove(tmp_path)
+            except FileNotFoundError:
+                pass
+            FreeCAD.Console.PrintWarning(f"Error capturing screenshot: {e}\n")
             return None
         if res is True:
             try:
