@@ -117,8 +117,9 @@ Pure bug-fix release on top of 1.1.0. Same user data dir, same Python, no API ch
 
 ### Selected Objects Appear Light Blue in Screenshots
 - **Symptom**: An object appears light blue in a screenshot even though `ShapeColor` is set correctly
-- **Root cause**: FreeCAD highlights selected objects with a light blue overlay. When taking screenshots via `get_view`, `analyze_view`, or `execute_code`, the last-created or focused object is often still selected
-- **Fix**: Call `FreeCADGui.Selection.clearSelection()` before taking screenshots if you need to verify true colors. Or simply recognize that light blue = selection highlight, not a color problem
+- **Root cause**: FreeCAD highlights selected objects with a light blue overlay
+- **Built-in fix**: `_save_active_screenshot` now clears the selection after `ViewSelection` positions the camera but before `saveImage` runs (with a Qt event flush between camera change and capture), so `get_view`/`snapshot_view`/`analyze_view` produce clean frames even when `focus_object` is set
+- **When you can still hit it**: if you select objects from `execute_code` or via the GUI and then capture a screenshot, the selection persists. Call `FreeCADGui.Selection.clearSelection()` first, or recognize that light blue = selection highlight, not a color problem
 - **Rule of thumb**: If only ONE object is blue and the rest show correct colors, it's just selected — the `ShapeColor` is fine
 
 ### `Part.fuse()` Can Freeze/Crash FreeCAD on Complex Shapes

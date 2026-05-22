@@ -150,6 +150,24 @@ rpc_response_queue = queue.Queue()
 _DISPATCH_SHUTDOWN = object()
 
 
+def _flush_gui_events(delay_ms: int = 50) -> None:
+    """Pump Qt events so pending view changes paint before the next step.
+
+    Calling ``view.fitAll()`` or ``ViewSelection`` only queues a re-render;
+    if ``saveImage()`` runs in the same Qt tick the framebuffer can be
+    captured before the camera change is applied. Flushing here forces the
+    paint to complete first.
+    """
+    FreeCADGui.updateGui()
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        return
+    app.processEvents(QtCore.QEventLoop.AllEvents, delay_ms)
+    if delay_ms > 0:
+        QtCore.QThread.msleep(delay_ms)
+        app.processEvents(QtCore.QEventLoop.AllEvents, delay_ms)
+
+
 def process_gui_tasks():
     # Resilience: a handler exception used to propagate out of this function,
     # skipping the QTimer reschedule at the end. The dispatch loop silently
@@ -628,7 +646,11 @@ class FreeCADRPC:
             else:
                 raise ValueError(f"Invalid view name: {view_name}")
 
-            # Focus on specific object or fit all
+            # Focus on specific object or fit all. When focusing, the
+            # selection is cleared *after* ViewSelection positions the
+            # camera but *before* saveImage captures the frame — otherwise
+            # the object renders with FreeCAD's blue selection overlay.
+            focused_selection = False
             if focus_object:
                 doc = FreeCAD.ActiveDocument
                 obj = doc.getObject(focus_object) if doc else None
@@ -636,13 +658,21 @@ class FreeCADRPC:
                     FreeCADGui.Selection.clearSelection()
                     FreeCADGui.Selection.addSelection(obj)
                     FreeCADGui.SendMsgToActiveView("ViewSelection")
+                    focused_selection = True
+                    _flush_gui_events()
+                    FreeCADGui.Selection.clearSelection()
                 else:
                     view.fitAll()
             else:
                 view.fitAll()
+
+            _flush_gui_events()
             actual_width = min(width if width is not None else _SCREENSHOT_DEFAULT_WIDTH, _SCREENSHOT_MAX_DIM)
             actual_height = min(height if height is not None else _SCREENSHOT_DEFAULT_HEIGHT, _SCREENSHOT_MAX_DIM)
             view.saveImage(save_path, actual_width, actual_height, background_color)
+
+            if focused_selection:
+                _flush_gui_events(delay_ms=0)
             return True
         except Exception as e:
             return str(e)
