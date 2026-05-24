@@ -46,6 +46,16 @@
           }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $(git rev-parse --show-toplevel)/.claude/hooks/subagent-output-check.py"
+          }
+        ]
+      }
     ]
   }
 }

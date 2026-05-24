@@ -2,6 +2,17 @@
 
 Read this file on every prompt to determine the correct approach.
 
+## Step 0: Are we in a structured design feature?
+
+Before classifying by area, check whether the work belongs to an active spec-driven-design feature:
+
+- Did the user say `/sdd`, "let's spec this out", "structured design", or similar?
+- Does the active FreeCAD document have an in-progress feature under `.designs/<doc>/journal/<feature-slug>/` (any spec.md / plan.md / reviews/ that isn't closed)?
+
+If yes, invoke the `spec-driven-design` skill (orchestrator for the lifecycle). It routes to the right phase skill (writing-design-spec / planning-design-feature / dispatching-design-subagents / reviewing-design-feature / closing-design-feature) based on journal state, and loads FreeCAD-MCP context as each phase needs it.
+
+If no (ad-hoc question, one-off code edit, debugging, etc.), continue to Step 1.
+
 ## Step 1: Classify the request
 
 Determine which area(s) the user's request falls into:
