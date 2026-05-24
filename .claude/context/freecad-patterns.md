@@ -31,6 +31,24 @@ getattr(obj, "Length")      # read property
 setattr(obj, "Length", 10)  # write property
 ```
 
+### Safe deletion of a PartDesign Body (and its children)
+
+Calling `doc.removeObject()` while iterating `doc.Objects` (or a body's `Group`) raises `Cannot access attribute of deleted object` as soon as the first child is gone — the live references in the iterator become stale. PartDesign Bodies hold Sketches, Pads, Patterns, ShapeBinders, and Datums that should be removed together to avoid orphaned dependencies.
+
+**Pattern**: collect every child's `Name` into a plain list (strings only, no live references) first, then iterate the list and remove by name. Remove the Body last.
+
+```python
+def delete_body(doc, body):
+    child_names = [o.Name for o in body.Group if o is not None]  # snapshot strings
+    for name in child_names:
+        if doc.getObject(name) is not None:
+            doc.removeObject(name)
+    doc.removeObject(body.Name)
+    doc.recompute()
+```
+
+The same pattern (snapshot names first, iterate strings, remove by name) applies to any bulk-deletion that uses live object references — including DocumentObjectGroup members and dependent feature trees.
+
 ## Placement & Geometry
 
 ```python
@@ -47,6 +65,26 @@ p = FreeCAD.Placement(
 )
 obj.Placement = p
 ```
+
+### Sampling terrain elevation via vertical line section
+
+To find the ground Z at an arbitrary (X, Y) sample point, intersect the terrain shape with a vertical `Part.LineSegment` spanning safely below to safely above the terrain, then read the intersection vertices. This gives exact elevations including multi-layer terrains (overhangs, caves, stacked surfaces). Reading from a BoundBox or projecting the nearest vertex is unreliable on non-flat or multi-shell terrain.
+
+```python
+import Part
+
+def sample_terrain_top_z(terrain_obj, x, y, z_lo=-1000, z_hi=10000):
+    """Return the highest Z where a vertical line at (x, y) hits the terrain shape."""
+    line = Part.LineSegment(
+        FreeCAD.Vector(x, y, z_lo),
+        FreeCAD.Vector(x, y, z_hi),
+    ).toShape()
+    section = terrain_obj.Shape.section(line, True)
+    zs = sorted((v.Z for v in section.Vertexes), reverse=True)
+    return zs[0] if zs else None
+```
+
+Useful for fall-protection regulations ("fence top must be ≥1.1m above outside ground"), drainage analysis, or any check that depends on the real ground level at a position. Sample at multiple positions along a perimeter to find the worst-case ground height.
 
 ## View Operations
 

@@ -63,7 +63,13 @@ When analyzing whether a set of objects covers a boundary (e.g., fence perimeter
 **Correct approach**: For each gap candidate, check whether any other object fills it before declaring a gap.
 
 ### Terrain surface Z detection
-`terrain.Shape.common(box).BoundBox.ZMax` returns the top of the terrain SOLID at a given XY location. This works well for surface detection but can return false highs (e.g., Z_max=6500) when:
+Two patterns exist for sampling terrain Z at an XY position:
+
+**Preferred — vertical line section** (see `freecad-patterns.md` § "Sampling terrain elevation via vertical line section"):
+Build a vertical `Part.LineSegment` and call `terrain.Shape.section(line, True)`. Returns explicit intersection vertices; sort by Z. Reliable for multi-layer / non-flat terrain.
+
+**Approximate — solid-common BoundBox**:
+`terrain.Shape.common(box).BoundBox.ZMax` returns the top of the intersection-solid at a given XY location. Fast but can return false highs (e.g., Z_max=6500) when:
 - The sample XY is inside the terrain body interior (e.g., mid-slope on a hillside)
 - The terrain body has pockets that re-open at that XY
 

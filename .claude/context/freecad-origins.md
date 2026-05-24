@@ -48,6 +48,29 @@ This means: if you give a Part a 45° rotation around Z, a child box placed at l
 
 ---
 
+## Gotcha: rotated-shape world BoundBox vs local edge parameters
+
+When a shape is rotated around any axis, `Shape.BoundBox` reports the projection of the geometry onto world axes — not the extents of the shape's local edges. Deriving a parameter along a local edge from a world-axis coordinate (e.g. solving for `t` along an edge using a world-Y value of a corner) silently produces wrong results whenever the edge isn't axis-aligned. The error grows with rotation angle and is invisible in screenshots until parts visibly drift.
+
+**Symptom**: A slab parallelogram rotated ~13° around Z has 4 corners spanning some world-Y range. Computing "where does the south edge of an inner subregion start along the local east edge?" by solving `Y(t) = world_Y_at_that_corner` gives a wrong `t` because the local edge isn't parallel to world Y — its direction has both X and Y components, so a constant world-Y line crosses the local edge at a different `t` than the corner's true position.
+
+**Fix**: Parameterize against the shape's actual vertices and local axis vectors, not against world-axis BB ranges. Recover the local axis by subtracting two corner vertices, then project sample points onto that axis.
+
+```python
+# v0, v1 are two adjacent corner vertices defining a local edge
+p0 = FreeCAD.Vector(v0.X, v0.Y, v0.Z)
+p1 = FreeCAD.Vector(v1.X, v1.Y, v1.Z)
+axis = (p1 - p0)
+length = axis.Length
+unit = axis / length
+# Parameter t in [0, length] for a sample world point P along this local edge:
+t = (P - p0).dot(unit)
+```
+
+The same principle applies when deriving picket positions, fence lengths, or any parametric value along an edge of a rotated structure — always project onto the local axis, never read from world BB extents.
+
+---
+
 ## Python Patterns
 
 ### Accessing axes and planes
@@ -110,6 +133,39 @@ doc.recompute()
 ```
 
 **When to use this pattern**: When an entire structure is rotated relative to global axes (e.g., a building not aligned with the street grid), create a parent App::Part with the rotation baked in, then model everything in axis-aligned local coordinates. Much simpler than manually rotating every solid.
+
+---
+
+## Gotcha: `Body.Shape.BoundBox` returns LOCAL coordinates inside an App::Part
+
+`Body.Shape.BoundBox` (or `Pocket.Shape.BoundBox`, or any feature inside a Body inside an App::Part) returns coordinates in the App::Part's **local frame**, NOT world coordinates. If the App::Part has a non-zero Placement, you will see numbers that disagree with what the object's world position is.
+
+**Example scenario**: An App::Part has `Placement.Z = 3000`. Its child Body reports `Shape.BoundBox.ZMin = 0`, `ZMax = 2400`. The wall the Body represents actually lives at WORLD Z = 3000..5400 — the parent's +3000 Z offset is silently applied at render time but is NOT reflected in the child Body's `Shape.BoundBox`. Treating the reported BB as world coords leads to placing dependent objects (railings, claddings, sections) at the wrong height.
+
+**Diagnostic**: walk up the parent chain and accumulate Placements. Only `App::Part` counts as a true coordinate frame; `App::DocumentObjectGroup` carries no Placement.
+
+```python
+def parents_of(o, doc):
+    return [p for p in doc.Objects if hasattr(p, 'Group') and o in (p.Group or [])]
+
+def cumulative_world_placement(o, doc):
+    pl = FreeCAD.Placement()
+    cur = o
+    while cur is not None:
+        if hasattr(cur, 'Placement') and cur.TypeId not in ("App::DocumentObjectGroup",):
+            pl = cur.Placement.multiply(pl)
+        parents = parents_of(cur, doc)
+        cur = next((p for p in parents if p.TypeId == "App::Part"), None)
+    return pl
+
+# To get the true WORLD BoundBox of a Body inside an App::Part:
+import Part
+sh_world = body.Shape.copy()
+sh_world.Placement = cumulative_world_placement(body, doc).multiply(sh_world.Placement)
+world_bb = sh_world.BoundBox
+```
+
+**Rule of thumb**: if a sketch / feature appears in the *correct visual position* in the GUI but `Shape.BoundBox` numbers look offset, suspect an App::Part parent with a non-zero Placement.
 
 ---
 

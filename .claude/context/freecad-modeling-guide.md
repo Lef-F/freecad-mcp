@@ -316,6 +316,64 @@ The `print` output is returned in the tool response — confirm success.
 
 ---
 
+## Parametric Assemblies: Part::Feature + Group beats monolithic PartDesign Body
+
+PartDesign Bodies are great for human modeling in the GUI but painful to introspect or edit via Python — sketches, pads, patterns, and datum references are deeply nested and order-dependent. Repairing or tweaking a parameter usually means rebuilding the whole feature tree. They also hide the real geometry behind the App::Part Placement (see `freecad-origins.md`), so reading `Shape.BoundBox` returns local coords that look wrong.
+
+**Pattern**: For Claude-maintained models, assemble related components as independent `Part::Feature` objects wrapped in a `App::DocumentObjectGroup`. Hoist every parameter (dimensions, counts, offsets, slope endpoints) into named constants at the top of the build script so the script itself is the source of truth. Each component is independently selectable, hideable, and replaceable. Re-running the build script with a different parameter value reproduces the design cleanly.
+
+```python
+# Parameters at top — single source of truth, easy to tweak
+RAIL_HEIGHT = 80
+PICKET_W, PICKET_GAP = 45, 30
+CAP_RAIL_Z_TOP = 6100
+
+def build_components(rail_h, pw, pg, cap_z):
+    # ... returns list of (Part.Solid, name) tuples
+    ...
+
+group = doc.addObject("App::DocumentObjectGroup", "Assembly")
+for shape, name in build_components(RAIL_HEIGHT, PICKET_W, PICKET_GAP, CAP_RAIL_Z_TOP):
+    feat = doc.addObject("Part::Feature", name)
+    feat.Shape = shape
+    feat.MCP_Role = "Final"  # tag per .claude/context/mcp-role-tagging.md
+    group.addObject(feat)
+```
+
+**When to use**: any structure assembled from multiple parts that share a coordinate system (fence panels, rail+picket+cap assemblies, modular wall systems, repeated colonnades). When the user later asks "make the cap rail 50mm taller", you edit one constant and re-run, instead of digging through a feature tree.
+
+---
+
+## Shared Profile Function for Co-located Objects
+
+When several objects sit on a common surface (a sloped wall top, the ground, a ramp), each object computing its own surface elevation independently — one linearly interpolated between endpoints, another piecewise-linear — guarantees visible drift between them. The mismatch only shows up after assembly, not in any single component's screenshot.
+
+**Pattern**: Define a single parametric `surface_z(t)` (or `surface_z(x, y)`) function and have every object that touches that surface call it. The function is the single source of truth for the surface; changing it updates all dependents consistently. Particularly important when one object uses `t_start..t_end` endpoints (effectively linear interpolation) while another iterates samples and queries the function piecewise — both MUST use the same function or they will silently disagree in the interior of the range.
+
+```python
+# Single source of truth for a piecewise-linear surface profile along a local edge.
+# Replace constants with your actual breakpoints for the surface you're modelling.
+T_PLATEAU_END = ...   # local-axis parameter where flat top transitions to slope
+T_SLOPE_END   = ...   # local-axis parameter at the far end of the slope
+Z_PLATEAU     = ...   # surface Z while on the flat top
+Z_END         = ...   # surface Z at the far end of the slope
+
+def surface_z(t):
+    if t <= T_PLATEAU_END: return Z_PLATEAU
+    if t >= T_SLOPE_END:   return Z_END
+    return Z_PLATEAU - (t - T_PLATEAU_END) / (T_SLOPE_END - T_PLATEAU_END) * (Z_PLATEAU - Z_END)
+
+# Every object that rides this surface calls the same function:
+rail_solid    = build_rail(t_start, t_end, surface_z(t_start), surface_z(t_end))
+for i in range(n_pickets):
+    t = i * pitch + offset
+    pickets.append(build_picket(t, z_bottom=surface_z(t), z_top=CAP_Z))
+```
+
+**Diagnostic**: if rail and pickets visibly drift apart in the middle of their range, suspect that the rail is using linear endpoint-to-endpoint interpolation while the pickets use a piecewise-linear function with a different breakpoint. Reconcile by funneling both through one shared function.
+
+---
+
 ## Pitfalls
 
 - **Overlap for booleans**: cutting tool must protrude slightly beyond both faces of the target solid (use ±5 mm) to avoid zero-thickness faces that FreeCAD may fail to process
@@ -323,8 +381,8 @@ The `print` output is returned in the tool response — confirm success.
 - **Source objects in booleans**: do not delete `Base` or `Tool` objects used by `Part::Cut`/`Part::Fuse` — they remain parametrically linked; hide them instead
 - **Staircase top step**: with `(i+1) * rise` cumulative height and `n` steps where `n = H / rise`, the top surface of the last step lands exactly at `z = sz + H` (the underside of the upper floor slab) — verify this aligns before cutting the opening
 - **get_objects on large documents**: can time out or exceed token limits; use `execute_code` + targeted queries instead
-- **`Shape.BoundBox` and `.Vertexes` return world coordinates** (Placement already applied). They do NOT return shape-local coordinates. `obj.Shape.BoundBox.XMin` gives the actual world-space position.
-- **Rotated / non-axis-aligned geometry**: `Shape.BoundBox` is the axis-aligned bounding box of the rotated shape — larger than the actual footprint. For rotated objects, extract actual vertices (`obj.Shape.Vertexes`) and compute geometry from edge directions. Use `Part.makePolygon` + `Part.Face` + `face.extrude()` for solids aligned with actual edges.
+- **`Shape.BoundBox` and `.Vertexes` apply the object's OWN Placement, not the parents'.** For a top-level object (or one whose `App::Part` ancestors have identity Placement), `Shape.BoundBox.XMin` is the actual world position. For an object nested inside an App::Part with a non-trivial Placement, `Shape.BoundBox` returns coords in that App::Part's local frame — NOT world. To get true world coords, walk up parents accumulating Placements (only App::Part counts; DocumentObjectGroup has no Placement). See `freecad-origins.md` § "Gotcha: `Body.Shape.BoundBox` returns LOCAL coordinates inside an App::Part" for the helper.
+- **Rotated / non-axis-aligned geometry**: `Shape.BoundBox` is the world-axis-aligned bounding box of the (possibly rotated) shape — its X/Y/Z ranges are world projections, NOT the shape's local edge extents. Do not derive parameters along a local edge from world-axis BB ranges; project sample points onto the local axis instead. See `freecad-origins.md` § "Gotcha: rotated-shape world BoundBox vs local edge parameters". For modeling new rotated solids, use `Part.makePolygon` + `Part.Face` + `face.extrude()` to align with actual edges.
 - **Multi-object assembly coverage**: never compare an individual object's BoundBox against the overall perimeter in isolation — multiple objects may jointly cover a boundary. See `designs-store.md` for the full anti-pattern.
 - **Terrain surface detection**: `solid.common(box).BoundBox.ZMax` can return false highs when sampling inside a hillside. See `designs-store.md` for details.
 - **Visibility pitfalls**: see `mcp-role-tagging.md` for the `MCP_Role` convention (`show_by_role()`) and `freecad-visibility.md` for the underlying mechanics (TechDraw crash, Body Tip, cascade propagation).
