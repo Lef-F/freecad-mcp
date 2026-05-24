@@ -400,6 +400,10 @@ if floor_edges and wall_top_edges:
 | `MeasureType = "True"` shows wrong value | Requires `References3D` to be set; if empty, falls back to stale/incorrect |
 | `-pz + C_y` formula gives wrong coords | That shortcut is for **vertical sections only** — use `project_to_section()` for tilted sections |
 | Radius / Diameter shows wrong value | Source edge must be a circular arc — check `type(Edges[i].Curve).__name__` |
-| **NEVER call `page.ViewObject.doubleClicked()` from MCP code** | Triggers TechDraw rendering internals which injects phantom `CosmeticVertex` objects with massive wrong coordinates (millions of mm), making the view appear enormous and unusable. TechDraw screenshots don't work from MCP anyway (`get_view` returns "Visual preview unavailable"). There is no valid reason to open a TechDraw page programmatically. |
-| Phantom CosmeticVertexes with huge coords (e.g. 2,978,200 mm) on a view | Created by TechDraw rendering side-effects. Fix: `view.removeCosmeticVertex(tag)` for each bad tag, then `doc.recompute()`. Detect: scan `view.CosmeticVertexes` for `abs(cv.Point.x) > 10000 or abs(cv.Point.y) > 10000`. |
+| Need to visually verify dimension placement on a TechDraw page | `get_view` can't capture TechDraw pages, but the QGraphicsScene render workaround in `.claude/context/freecad-drawings.md` § "Rendering a TechDraw Page to PNG" can. `page.ViewObject.doubleClicked()` is safe to call (source: `ViewProviderPage.cpp:268-276` does not call `addCosmeticVertex`). |
+| Phantom CosmeticVertexes appear with huge coords (e.g. 2,978,200 mm) | Some user-invoked TechDraw command path created them. Cleanup: scan `view.CosmeticVertexes` for `abs(cv.Point.x) > 10000 or abs(cv.Point.y) > 10000`, call `view.removeCosmeticVertex(tag)` for each, then `doc.recompute()`. |
 | **NEVER call `FreeCADGui.updateGui()` without a specific reason** | Flushing the GUI event queue can trigger pending TechDraw or PartDesign operations unexpectedly, causing hard-to-diagnose side effects including phantom vertex injection. |
+
+## Visual verification
+
+After placing or moving dimensions, render the page to PNG and inspect visually — both at overview (1500 px wide for context) and zoomed-crop (`source_rect` covering just the dimension area at 1500–2500 px wide for pixel-level placement check). See `.claude/context/freecad-drawings.md` § "Rendering a TechDraw Page to PNG" for the `render_techdraw_page()` helper. Switch back to the 3D view with `FreeCADGui.activateView("Gui::View3DInventor", False)` afterward so subsequent `get_view()` calls work.

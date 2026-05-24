@@ -58,6 +58,8 @@ Most mutation tools return a base64 PNG screenshot. The addon checks view compat
 
 **Graceful degradation**: When the active view doesn't support `saveImage` (TechDraw, Spreadsheet), the screenshot is skipped and a text note is returned instead. The tool never fails due to a missing screenshot.
 
+**TechDraw page rendering workaround**: Even though `get_view` can't capture TechDraw pages, you CAN render them to PNG by navigating to the underlying `QGraphicsScene` via Qt and calling `scene.render(QPainter)`. The full recipe (verified end-to-end on FreeCAD 1.1.1) plus the `render_techdraw_page()` helper with optional `source_rect` for zoom-cropping detail areas is in `.claude/context/freecad-drawings.md`. Use it for any visual verification of TechDraw work (Phase F of a redesign, dimension placement reviews, drawing diffs after model edits).
+
 ### Visibility Convention — `MCP_Role` Tagging
 
 Every object in a FreeCAD document gets an `App::PropertyEnumeration` called `MCP_Role` (values: `Final`, `Intermediate`, `Alternative`, `Deprecated`). This drives all visibility management. See `.claude/context/mcp-role-tagging.md` for the full convention, scripts (`show_by_role()`, `tag_all_objects()`), and Claude's rules.
@@ -252,6 +254,24 @@ Committed files (`.claude/context/`, `.claude/rules/`, `CLAUDE.md`, skill files,
 All project-specific data — object names, dimensions, decisions, observations, coordinates, task lists — belongs **exclusively** in `.designs/<document-name>/` which is gitignored.
 
 When a design session surfaces a reusable insight (e.g., a modeling pitfall), generalize it completely before adding it to a committed context file. If it cannot be stated without referencing project specifics, it goes only in `.designs/`.
+
+### Spec-driven design journal (`.designs/<doc>/journal/<feature-slug>/`)
+
+For non-trivial design features (more than a couple of execute_code calls), use the structured `spec-driven-design` skill collection. Entry point: `/sdd <feature-slug>` (or invoke the `spec-driven-design` skill directly).
+
+Each feature lives at `.designs/<doc-name>/journal/<feature-slug>/` and progresses through five phases:
+
+1. **spec** -> `spec.md` (writing-design-spec): Background, Goal, Scope, Out-of-scope, Acceptance criteria, Constraints.
+2. **plan** -> `plan.md` (planning-design-feature): ordered tasks tagged with one of five dispatch archetypes (RPC-Exec / Apply-Patch / Explore / Research / Review).
+3. **build** -> `build/<task-id>.md` (dispatching-design-subagents): each subagent writes its result to a pre-declared file; the SubagentStop hook warns if it doesn't.
+4. **review** -> `reviews/{correctness,conventions,integration}.md` (reviewing-design-feature): two parallel reviewers plus an integration pass.
+5. **close** -> `closeout.md` (closing-design-feature): aggregates spec / plan / reviews, surfaces side-effect code commits, updates `objects.md` and `tasks.md`.
+
+The journal is gitignored (inherits from `.designs/`). The convention is advisory (v1): the SubagentStop hook at `.claude/hooks/subagent-output-check.py` warns to stderr if a declared `# expected_output: <path>` magic comment in a subagent prompt isn't honored, but does not block.
+
+Code changes (new MCP tools, addon fixes, skill updates) that emerge from design work are tracked in `plan.md`'s side-effect tracker and decided on at close.
+
+See `.claude/skills/spec-driven-design/SKILL.md` for the orchestrator and `.claude/skills/{writing,planning,dispatching,reviewing,closing}-design-{spec,feature,subagents}/SKILL.md` for each phase.
 
 ## Conventions
 

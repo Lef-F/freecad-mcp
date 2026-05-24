@@ -183,7 +183,7 @@ class MyWorkbench(Workbench):
 
 - All GUI operations must run on the Qt main thread (use the task queue)
 - `obj.ViewObject` is only available when FreeCADGui is loaded
-- `saveImage()` fails on TechDraw, Spreadsheet, and Drawing views
+- `saveImage()` fails on TechDraw, Spreadsheet, and Drawing views. For TechDraw specifically, the QGraphicsScene render workaround documented in `.claude/context/freecad-drawings.md` § "Rendering a TechDraw Page to PNG" lets you produce PNGs anyway.
 - FreeCAD's embedded Python version may differ from the system Python
 - **Version compatibility**: Guard `isinstance` checks on FreeCAD types with `hasattr` (e.g., `hasattr(App, "Color") and isinstance(value, App.Color)`). Some types don't exist in all FreeCAD versions.
 - **Screenshot size**: Always pass explicit `width`/`height` dimensions for MCP responses to avoid oversized images on high-DPI displays
