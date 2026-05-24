@@ -69,6 +69,12 @@ t = (P - p0).dot(unit)
 
 The same principle applies when deriving picket positions, fence lengths, or any parametric value along an edge of a rotated structure — always project onto the local axis, never read from world BB extents.
 
+### Corollary: a rotated square's world BoundBox OVERSTATES its side length
+
+A square member of side `w` rotated by angle `t` in the XY plane has an axis-aligned bounding box of `w * (|cos t| + |sin t|)` on each side, NOT `w`. So a 45 mm picket rotated 12 degrees to align with an angled fence reads as ~53.4 mm in its BoundBox (45 * (cos12 + sin12) = 45 * 1.186). Reading the bbox and treating it as the member's true cross-section silently inflates the size (and, if you then rebuild axis-aligned boxes from the bbox, you fatten every member and shrink the gaps).
+
+To recover the true side length of a rotated square member: take the half-diagonal from center to a corner vertex and divide by sqrt(2), times 2 (`side = (corner - center).Length / sqrt(2) * 2`), or inspect a face's actual edge length, never the bbox.
+
 ---
 
 ## Python Patterns

@@ -130,6 +130,15 @@ Options:
 - `--format glb` — single binary file instead of gltf+bin
 - `--skip-export` — re-run cleanup on an existing file (no FreeCAD connection needed)
 
+#### Versioning & overwrite behavior
+
+There is **no version history**; each export is latest-only:
+- The output filename is keyed solely on the FreeCAD document name (`<doc_name>.gltf`). Re-exporting the **same** document overwrites its files in place. A document renamed/forked to a new name (e.g. `..._v2`) produces a **new** filename, so it does not overwrite the previous one's model files.
+- `export-info.json` is a **single pointer** (`{"model": "<doc_name>.gltf", ...}`) plus a render timestamp. The viewer (`index.html`) loads whatever `info.model` names, so the site always shows the most recent export. The timestamp is metadata, not history.
+- `sync-to-s3.sh` uploads everything in `public/` with **no `--delete`**, so old model files from prior doc names linger on S3 (harmless storage) but are not reachable through the site unless you point `export-info.json` back at them and re-sync.
+
+To get switchable versions you would need per-version subfolders or deploy prefixes plus a viewer version picker. Not built in.
+
 ### 5. Serve locally
 
 ```bash

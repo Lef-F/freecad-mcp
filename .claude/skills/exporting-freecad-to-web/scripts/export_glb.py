@@ -208,7 +208,11 @@ else:
         tmp_name = "_tmp_mesh2part_%s" % obj.Name
         tmp_obj = doc.addObject("Part::Feature", tmp_name)
         tmp_obj.Shape = shape
-        tmp_obj.Placement = obj.Placement
+        # IMPORTANT: leave the temp object's Placement at identity. obj.Mesh.Topology
+        # already returns points in GLOBAL coords (the mesh's Placement is baked in),
+        # so the shape built above is already positioned. Re-applying obj.Placement
+        # here would DOUBLE any non-identity placement (e.g. a Mesh figure moved via
+        # Placement would export at twice its intended offset).
         # Copy color and transparency from original mesh
         if hasattr(obj, "ViewObject"):
             try:

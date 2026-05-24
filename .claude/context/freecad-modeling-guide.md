@@ -445,6 +445,39 @@ Useful for perimeter footprints (drainage trenches, ring foundations, racetrack 
 
 ---
 
+## FreeCAD Python API gotchas
+
+### `Vector.multiply(scalar)` mutates in place
+
+`FreeCAD.Vector.multiply(s)` scales the vector **in place** and returns `self` (it does NOT return a new vector). Reusing a direction/normal vector after calling `.multiply()` on it silently corrupts every later use.
+
+```python
+along = V(dx/L, dy/L, 0)            # unit direction
+p_start = c0 - along.multiply(EXT)  # BUG: along is now EXT-times longer!
+p_end   = c0 + along.multiply(EXT)  # uses the already-corrupted along
+```
+
+The symptom is spectacular: geometry built afterward lands at absurd coordinates (bounding boxes in the 1e+100 range, parts scattered to "infinity").
+
+**Fix**: use the `*` operator, which returns a new vector and leaves the operand untouched:
+
+```python
+p_start = c0 - along * EXT          # along stays a unit vector
+p_end   = c0 + along * EXT
+```
+
+Rule of thumb: never call `.multiply()` / `.add()` / `.sub()` on a vector you intend to reuse; prefer the `*`, `+`, `-` operators, which are non-mutating.
+
+### `Mesh::Feature.Mesh.Topology` / `.BoundBox` return GLOBAL coords
+
+For a `Mesh::Feature`, `obj.Mesh.Topology` (and `obj.Mesh.BoundBox`) return points with the object's `Placement` **already applied** (i.e. global/world coordinates). This is the opposite of `Part` geometry inside an `App::Part`, where `Shape.BoundBox` is local (see `freecad-origins.md`).
+
+Consequences:
+- Setting `obj.Placement` and then reading `obj.Mesh.BoundBox` shows the **moved** position (placement baked in), not the local mesh extent.
+- Code that builds a shape from `obj.Mesh.Topology` and then *also* assigns `obj.Placement` to the result will **double-apply** the placement. To move a mesh reliably for export, bake the offset into the mesh geometry (`mesh.translate(dx,dy,dz)`) and keep `Placement` at identity, OR build from Topology and leave the derived object's placement at identity.
+
+---
+
 ## Pitfalls
 
 - **Overlap for booleans**: cutting tool must protrude slightly beyond both faces of the target solid (use ±5 mm) to avoid zero-thickness faces that FreeCAD may fail to process
