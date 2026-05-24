@@ -29,6 +29,20 @@ Reference for known bugs, version-specific issues, and workarounds.
 - **Status**: Fixed — `execute_code` now accepts `capture_screenshot=False` to skip the screenshot
 - **Workaround (before fix)**: Use `--only-text-feedback` flag
 
+### GUI Task Timeout on Heavy Recomputes Is Not a Failure
+- **Symptom**: An `execute_code` call returns `"Failed to execute code: GUI task timed out. FreeCAD may be unresponsive."` after a script that does `doc.recompute()`, deletes many objects, or triggers TechDraw page rebuilds.
+- **Root cause**: The RPC layer's per-call response queue has a 30-second timeout (see `_dispatch_to_gui` in `addon/FreeCADMCP/rpc_server/rpc_server.py`). Heavy recomputes on documents with many TechDraw pages, complex bodies, or large Boolean chains can exceed this even though the operation eventually completes successfully on the GUI thread.
+- **Key insight**: the timeout is on the RPC reply path, NOT on the FreeCAD operation. The script DID run; you just didn't get the printed output.
+- **Diagnostic**: re-query state with a lighter call immediately after.
+  ```python
+  # Check if the previous operation actually landed:
+  obj = doc.getObject("YourTargetObject")
+  print(f"vol={obj.Shape.Volume:.0f} faces={len(obj.Shape.Faces)}")
+  ```
+  If the values are what you expected, the timed-out operation succeeded. Proceed. If not, then investigate.
+- **What NOT to do**: don't blindly retry the timed-out call. If the operation creates objects, retry can leave the document in a half-created state (duplicate objects, stale references).
+- **When to actually worry**: if a follow-up lighter query ALSO times out, FreeCAD may be genuinely hung. Switch to the GUI to confirm. But most timeouts are just "the work was bigger than 30s".
+
 ### MCP/Addon Version Mismatch — `summary_only` Parameter
 - **Symptom**: If MCP server is 0.1.17+ but FreeCAD addon is older (pre-0.1.17), calling `get_objects` will fail with `TypeError: get_objects() takes 2 positional arguments but 3 were given` because the old addon doesn't accept the `summary_only` positional arg
 - **Fix**: Restart FreeCAD after deploying the updated addon to `Mod/FreeCADMCP/`

@@ -374,6 +374,77 @@ for i in range(n_pickets):
 
 ---
 
+## Boolean Operations and Cutter Selection
+
+### OCCT Booleans return `TopoDS_Compound`, not `Solid`
+
+`shape.cut(...)`, `shape.common(...)`, and `shape.fuse(...)` all return a `Compound` even when the result contains exactly one solid. Assigning that compound directly to `Part::Feature.Shape` produces `Shape.ShapeType == "Compound"`, which surprises callers that expect `"Solid"` and breaks any acceptance check or downstream Boolean that requires a Solid input.
+
+**Fix**: always extract the contained Solid(s) before assigning.
+
+```python
+result = prism.common(cutter.Shape)
+if result.Volume <= 0:
+    raise RuntimeError(f"Empty Boolean result (vol={result.Volume})")
+
+if len(result.Solids) == 1:
+    feature.Shape = result.Solids[0]                     # ShapeType == "Solid"
+elif len(result.Solids) > 1:
+    feature.Shape = Part.Compound(result.Solids)         # multi-solid compound
+else:
+    raise RuntimeError("Boolean result has no Solids")
+```
+
+### Never feed a 3D curved face as a PartDesign Pocket Profile
+
+`PartDesign::Pocket`'s `Profile` is meant to be a 2D sketch. If you set Profile to a `SubShapeBinder` of a curved 3D face (e.g., a face from a terrain shell, a `Part::Scale` of a loft, or any `BSplineSurface`), PartDesign attempts to extrude that face along its own normal direction. Because the face isn't planar, the extrusion sweeps a twisted `Part::SurfaceOfExtrusion` cutter that doesn't cleanly bound the body, leaving a stray `SurfaceOfExtrusion` face on the body's Tip that visually looks like a phantom slanted plane.
+
+**Symptom**: a body that's "almost right" but has one suspicious slanted face inheriting through to its Tip (`SurfaceOfExtrusion` in the face's `Surface` type). Downstream features that use the Tip carry the artifact forward.
+
+**Diagnostic**:
+```python
+import collections
+hist = collections.Counter(type(f.Surface).__name__ for f in body.Tip.Shape.Faces)
+print(hist)
+# {'Plane': 14, 'BSplineSurface': 8, 'SurfaceOfExtrusion': 1}  ← the 1 is the phantom
+```
+
+**Fix**: drop the PartDesign chain and use Part workbench Boolean ops (`Part.cut`, `Part.common`) against valid solids instead. They handle 3D-vs-3D cleanly and never produce SurfaceOfExtrusion artifacts. If you need to follow a curved surface from above, build a closed solid that brackets the surface (extrude a face from below to above the surface) and Boolean against that.
+
+### When a body has accumulated pockets, the upstream `Part::MultiFuse` is often the right cutter
+
+If you want to Boolean against "the original terrain envelope" (or any base shape that has had pockets carved into it for unrelated features), `body.Shape` may be unusable: `prism.common(body.Shape)` can return `Volume = 0` if your prism falls entirely inside the carved voids.
+
+Find the upstream un-pocketed source (typically a `Part::MultiFuse` or `Part::Fusion` that the body chain consumes) and Boolean against that instead. Then subtract the current body to remove parts that are still genuinely solid:
+
+```python
+# Goal: fill the void that exists between the original (pre-pocket) envelope and the current body.
+# Find the upstream un-pocketed source -- often a Part::MultiFuse / Part::Fusion in the document --
+# and Boolean against that instead of the carved body's final Shape.
+envelope_obj = doc.getObject("<your_upstream_multifuse>")   # the un-pocketed base
+carved_obj   = doc.getObject("<your_carved_body>")           # the body whose voids you must respect
+
+bounded = my_prism.common(envelope_obj.Shape)   # capped by original envelope, not the carved body
+void    = bounded.cut(carved_obj.Shape)          # subtract the still-solid parts
+```
+
+**When this matters**: terrain-following gravel fills, soil-fill volumes around walls, anything where the body's voids define the space you want to occupy rather than the space you want to exclude.
+
+### Closed wire with figure-8 / even-odd winding → annular Face
+
+A single closed wire that walks the outer corners in one order, jumps to the inner ring, walks the inner corners in the same rotational order, and closes back to the first outer corner produces a single planar face that fills the **band/annulus** between the two rings (even/odd fill rule). No need to build separate outer and inner wires and subtract.
+
+```python
+verts = [outer_NW, outer_NE, outer_SE, outer_SW, inner_SW, inner_SE, inner_NE, inner_NW]
+wire = Part.makePolygon(verts + [verts[0]])   # closed
+band_face = Part.Face(wire)
+# band_face.Area == outer_polygon_area - inner_polygon_area
+```
+
+Useful for perimeter footprints (drainage trenches, ring foundations, racetrack moats). The wire is also easy to edit later: change one vertex and the band shape updates.
+
+---
+
 ## Pitfalls
 
 - **Overlap for booleans**: cutting tool must protrude slightly beyond both faces of the target solid (use ±5 mm) to avoid zero-thickness faces that FreeCAD may fail to process

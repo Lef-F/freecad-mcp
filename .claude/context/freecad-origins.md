@@ -169,6 +169,44 @@ world_bb = sh_world.BoundBox
 
 ---
 
+## Gotcha: Writing a Shape inside an App::Part (Placement composes, not auto-compensates)
+
+When you `parent.addObject(child)` where `parent` is an `App::Part` with a non-identity Placement, FreeCAD does **NOT** auto-adjust the child's Placement to keep its world position constant. The child inherits the parent's Placement at render time, so:
+
+```
+rendered_world_position = parent.Placement × child.Placement × child.Shape.local_coords
+```
+
+If you built `child.Shape` in **world coordinates** and then assigned it to a child of an App::Part with `Placement = (0,0,+3000)`, the rendered object will float +3000mm above where you intended.
+
+**Symptom**: An object is geometrically correct in isolation (Shape vertices match the world coords you computed) but renders at a position offset by the parent's Placement. Volume, face count, and shape are right; only the visual Z (or X/Y) is wrong, by exactly the parent's offset.
+
+**Three valid fixes**:
+
+```python
+# Option A: keep the object top-level (no App::Part parent at all)
+obj = doc.addObject("Part::Feature", "Thing")
+obj.Shape = world_shape  # placement (0,0,0), GlobalPlacement (0,0,0), renders at world coords
+
+# Option B: transform Shape to parent-LOCAL coords before assigning
+parent_gp = parent.getGlobalPlacement()
+local_shape = world_shape.copy()
+local_shape.transformShape(parent_gp.inverse().toMatrix())
+obj = doc.addObject("Part::Feature", "Thing")
+parent.addObject(obj)
+obj.Shape = local_shape  # parent.Placement re-applies the offset at render time
+
+# Option C: assign world Shape, then explicitly set Placement to the parent's inverse.
+# (Less common, and beware: assigning .Placement on an App::Part child can trigger
+# downstream auto-adjustment; verify after recompute that .getGlobalPlacement() is identity.)
+```
+
+**Diagnostic**: after `parent.addObject(child)`, compare `child.getGlobalPlacement()` to `child.Placement`. If they differ, the parent's Placement is being inherited. Then check whether `child.Shape.BoundBox` reflects world or local coords (it's local). The actual rendered position is `child.getGlobalPlacement().multVec(shape_point)`.
+
+**Rule of thumb**: if your geometry math was correct and your visualization is off by a constant offset that matches an ancestor App::Part's Placement, this is the bug. Pick option A or B and move on.
+
+---
+
 ## Visibility
 
 `App::Origin`, `App::Line`, `App::Plane`, and `App::Point` should almost never be visible. A document with 30 Part/Body containers has **210 origin objects** in FreeCAD 1.0 (30 x 7) or **240** in 1.1+ (30 x 8). See `freecad-visibility.md` for the canonical noise filter, cleanup scripts, and the full always-hidden type list.
