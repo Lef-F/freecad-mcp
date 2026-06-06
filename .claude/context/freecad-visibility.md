@@ -8,9 +8,19 @@ Which objects should be hidden by default and why. Applies to any FreeCAD docume
 
 **Never set `obj.ViewObject.Visibility = True` on a `TechDraw::DrawPage` object.** Doing so activates the page as the active MDI window, switching the view away from the 3D viewport. Cycling through multiple TechDraw pages in a visibility loop causes rapid MDI window switching that **crashes FreeCAD**.
 
-The same applies to all TechDraw view objects — only the DrawPage is dangerous enough to crash, but the others corrupt the active-view state.
+**Safe rule for the 3D viewport: never call `.Visibility = True` on any object unless you have positively identified it as a 3D geometry object.** Always check TypeId first. The safe way to restore viewport visibility is to track which objects were visible *before* your changes and restore only those by name.
 
-**Safe rule: never call `.Visibility = True` on any object unless you have positively identified it as a 3D geometry object.** Always check TypeId first. The safe way to restore visibility is to track which objects were visible *before* your changes and restore only those by name.
+## ⚠️ EQUALLY CRITICAL — hiding a TechDraw *view* object blanks the page
+
+A TechDraw **view** object (`DrawViewPart`, `DrawProjGroupItem`, `DrawProjGroup`, `DrawViewSection`, `DrawViewDimension`, `DrawSVGTemplate`, …) does **not** appear in the 3D viewport at all — it is a 2D item on a drawing page. Its `ViewObject.Visibility` therefore controls **whether it renders on the page and in PDF/SVG exports**, NOT whether it clutters the 3D view.
+
+**Setting `Visibility = False` on a TechDraw view object silently drops it from the page.** Hide every view on a page and the page exports as a bare template (title block only, no geometry) with no error — `getVisibleEdges()` still reports the projected edges, and `State` still reads `Up-to-date`, so the breakage is invisible until you actually look at the export.
+
+**Rules:**
+- **Never include TechDraw view objects in a "hide all noise" / bulk-cleanup sweep.** They are not 3D-viewport noise.
+- TechDraw view objects should stay `Visibility = True`. The only TechDraw type you ever set `False` is `DrawPage` (closes its tab; safe).
+- If pages export blank, the first thing to check is `[o.Name for o in doc.Objects if o.TypeId.startswith("TechDraw") and o.TypeId != "TechDraw::DrawPage" and not o.Visibility]` — set those back to `True` and re-export.
+- `show_by_role()` (see `mcp-role-tagging.md`) now has a Pass 4 that re-shows TechDraw view objects for exactly this reason; older versions hid them and blanked drawings.
 
 ---
 
@@ -34,15 +44,13 @@ These types exist in every FreeCAD document but should never be visible in the 3
 | `Part::Part2DObjectPython` (shape view) | `Shape2DView`, … | 2D projection objects feeding TechDraw pages |
 | `Part::Part2DObjectPython` (curves) | `BSpline`, `Line001`, … | Guide curves, contour lines — not final geometry |
 | Terrain construction intermediaries | `Shell`, `Scale`, `Fusion`, `Loft001`, `Loft002`, `Extrude001` | Hidden construction chain feeding final terrain body |
-| `TechDraw::DrawPage` | `Situationsplan base`, `Planritning`, … | **⚠️ CRASHES FREECAD if .Visibility toggled in a loop** — activates page as MDI window |
-| `TechDraw::DrawViewPart` | `View`, `View001`, … | 2D projection views on TechDraw pages |
-| `TechDraw::DrawViewSection` | `Section`, `SectionB`, … | Section views on TechDraw pages |
-| `TechDraw::DrawViewDetail` | `Detail`, … | Detail views on TechDraw pages |
-| `TechDraw::DrawHatch` | `Hatch`, … | Hatching on TechDraw pages |
-| `TechDraw::DrawViewDimension` | `Dimension`, `Dimension002`, … | Dimension annotations — belong to TechDraw pages only |
-| `TechDraw::DrawSVGTemplate` | `Template`, `Template001`, … | Page templates — belong to TechDraw pages only |
-| `TechDraw::DrawLeaderLine` | `LeaderLine`, … | Leader lines on TechDraw pages |
-| `TechDraw::DrawRichAnno` | `RichAnno`, … | Rich text annotations on TechDraw pages |
+| `TechDraw::DrawPage` | `Situationsplan base`, `Planritning`, … | **⚠️ CRASHES FREECAD if .Visibility toggled in a loop** — activates page as MDI window. Set `False` is safe (closes tab); never set `True` in a loop. |
+
+> **TechDraw *view* objects are deliberately NOT in this table.** `DrawViewPart`,
+> `DrawProjGroupItem`, `DrawProjGroup`, `DrawViewSection`, `DrawViewDetail`, `DrawHatch`,
+> `DrawViewDimension`, `DrawSVGTemplate`, `DrawLeaderLine`, `DrawRichAnno` live only on drawing
+> pages and never render in the 3D viewport. Their `Visibility` controls page rendering, so they
+> must stay `Visibility = True`. Hiding them blanks the page export. See the critical warning above.
 
 ---
 
@@ -71,10 +79,10 @@ doc = FreeCAD.ActiveDocument
 
 always_hidden_types = {
     "App::Origin", "App::Line", "App::Plane", "App::Point", "App::OriginFeature",
-    "TechDraw::DrawPage",   # ⚠️ CRASH RISK — do not set Visibility on these
-    "TechDraw::DrawViewPart", "TechDraw::DrawViewSection", "TechDraw::DrawViewDetail",
-    "TechDraw::DrawHatch", "TechDraw::DrawViewDimension", "TechDraw::DrawSVGTemplate",
-    "TechDraw::DrawLeaderLine", "TechDraw::DrawRichAnno",
+    "TechDraw::DrawPage",   # ⚠️ CRASH RISK — never set Visibility=True; do not list view objects here
+    # NOTE: TechDraw view objects (DrawViewPart/DrawProjGroupItem/DrawViewSection/
+    # DrawViewDimension/DrawSVGTemplate/...) are intentionally omitted — they must stay
+    # visible or the page exports blank. Do not treat them as viewport noise.
     "PartDesign::SubShapeBinder",
     "PartDesign::Pad", "PartDesign::Pocket",
     "PartDesign::LinearPattern", "PartDesign::AdditiveLoft",
@@ -116,11 +124,12 @@ doc = FreeCAD.ActiveDocument
 always_hidden_types = {
     # Origins (MUST hide — 100+ in large docs)
     "App::Origin", "App::Line", "App::Plane", "App::Point", "App::OriginFeature",
-    # TechDraw — DrawPage CRASHES FreeCAD if set visible in a loop; hide entire family
+    # TechDraw — ONLY DrawPage. Setting DrawPage False is safe (closes its tab).
+    # DO NOT add TechDraw view objects (DrawViewPart/DrawProjGroupItem/DrawViewSection/
+    # DrawViewDimension/DrawSVGTemplate/...) here: they never show in the 3D viewport, and
+    # hiding them blanks the page export (title block only, no geometry). See the critical
+    # warning at the top of this file.
     "TechDraw::DrawPage",
-    "TechDraw::DrawViewPart", "TechDraw::DrawViewSection", "TechDraw::DrawViewDetail",
-    "TechDraw::DrawHatch", "TechDraw::DrawViewDimension", "TechDraw::DrawSVGTemplate",
-    "TechDraw::DrawLeaderLine", "TechDraw::DrawRichAnno",
     # PartDesign internals
     "PartDesign::SubShapeBinder",
     "PartDesign::Pad", "PartDesign::Pocket",

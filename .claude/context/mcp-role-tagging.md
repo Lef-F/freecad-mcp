@@ -139,6 +139,25 @@ def show_by_role(doc, roles=None):
                 except Exception:
                     pass
 
+    # --- Pass 4: Ensure TechDraw views render (self-heal blank drawings) ---
+    # A TechDraw view object (DrawProjGroupItem / DrawViewPart / DrawViewSection /
+    # DrawViewDimension / DrawSVGTemplate) with Visibility = False is silently dropped
+    # from page exports AND from the page MDI -> the page renders as a bare template
+    # with no geometry. Pass 1 already skips these (won't hide them), but an older
+    # version of this function, or a manual toggle, can leave them hidden, and nothing
+    # here would ever recover them. Hiding a view object serves no purpose, so force
+    # every non-page TechDraw object visible. NEVER set DrawPage True (crashes FreeCAD).
+    for obj in doc.Objects:
+        if not obj.TypeId.startswith("TechDraw") or obj.TypeId == "TechDraw::DrawPage":
+            continue
+        if not hasattr(obj, "ViewObject") or obj.ViewObject is None:
+            continue
+        try:
+            if not obj.ViewObject.Visibility:
+                obj.ViewObject.Visibility = True
+        except Exception:
+            pass
+
     # --- Activate 3D view ---
     try:
         mw = FreeCADGui.getMainWindow()
