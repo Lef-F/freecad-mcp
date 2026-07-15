@@ -285,7 +285,7 @@ render_techdraw_page(page, "/tmp/titleblock_zoom.png",
 # combined with same target width, every pixel in source maps to ~2.9 pixels in output.
 ```
 
-Verified example from `parking_lot_v9` Sektion B-B page: full scene bbox is 2972 × 2101 (in TechDraw scene units, roughly mm-scaled-by-template-scale). Title block ROI of 1040 × 357 rendered at 1500 px wide yielded crisp anti-aliased text — every character legible.
+Verified example from a section-view page: full scene bbox was 2972 × 2101 (in TechDraw scene units, roughly mm-scaled-by-template-scale). A title-block ROI of 1040 × 357 rendered at 1500 px wide yielded crisp anti-aliased text, every character legible.
 
 ### Gotchas (each one was hit during development — don't repeat)
 

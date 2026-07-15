@@ -135,7 +135,7 @@ For a construction/architecture design:
     Vehicle ramp body
 📁 [Hidden] Terrain Inputs
     Intermediate lofts, shell, scale, fusion objects feeding the Terrain body
-📁 [Hidden] Base Sketches   ← already Group001 in parking_lot_v6
+📁 [Hidden] Base Sketches   ← already Group001 in the document
 📁 [Hidden] Section Objects ← already Group002
 📁 [Hidden] Contours        ← already Group004
 📁 Drawings                 ← TechDraw pages
