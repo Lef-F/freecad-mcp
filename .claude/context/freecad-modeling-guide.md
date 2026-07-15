@@ -184,6 +184,79 @@ Key insight: giving each step a **cumulative** height (`(i+1) * rise`) creates t
 Total footprint: `n * run` in X, `sw` in Y.
 Top step surface reaches z = `sz + H` (top of walls / bottom of upper floor slab).
 
+### Constant-height rail / fall protection over a multi-flight stair
+
+To hold a rail (handrail or fall protection) a constant vertical offset `H` above the nosing
+line of a stair that has more than one flight (different pitches) plus a mid-landing:
+
+- Build ONE straight rail beam per flight, parallel to that flight's nosing pitch, translated
+  `+H` in Z. A beam parallel to a flight's pitch is automatically a constant `H` above every
+  nosing on that flight (verify by sampling rail-top Z at a few stations vs `nosing_Z + H`).
+- Add a FLAT beam over the landing at `landing_surface_Z + H`.
+- Connect the segments at the kinks (pitch change, or landing meeting a flight) with short
+  connector pieces; a post at each kink can also bridge a purely vertical jog.
+- Place balusters at a fixed pitch along each segment, bottoms following the nosing line, tops
+  embedded a few mm into the rail underside so a sloped-rail-vs-flat-baluster-top mismatch
+  never opens a gap.
+
+Gotcha: the transition SPAN between a flight and the landing (where the plan position jogs but
+only a post sits) easily leaves a clear opening larger than the allowed baluster gap. Fill
+those transition spans with extra balusters, and verify the GLOBAL maximum clear gap across all
+balusters and posts (project their centres onto the stair travel direction, sort, take the max
+consecutive clear gap), not just the gap within each flight.
+
+---
+
+## Open Fences and Railings (sizing to a transparency target)
+
+When a railing or fence must hit a target openness (percent air), e.g. for a permit
+"genomsiktlighet" requirement, size the members to the metric the reviewer uses:
+
+- Material fraction of a picket field ~= `section / pitch` (e.g. 10 mm pickets at 100 mm pitch ->
+  10% material, 90% air). Keep `pitch - section <= max_opening` (commonly 100 mm child-safety).
+- If openness is measured over the WHOLE fence envelope, the top/bottom rails count too, so make the
+  rails the SAME thin section as the pickets, not chunky bars. A 100 mm-tall bottom rail alone can
+  cost 10-15% air. Compute `air = 1 - projected_material_area / (run_length * height)` with a
+  `uv run python3` script before declaring a number.
+
+### Slimming an existing (rotated) picket / post array
+
+Pickets/posts are often square prisms placed on a rotated design grid (their object Placement
+carries the rotation; the solids' world-axis BB is therefore larger than the true section). To slim
+without losing position or angle, rebuild each as a centered box at the solid's BoundBox.Center with
+the same rotation:
+
+```python
+ROT = App.Rotation(App.Vector(0,0,1), 12)   # the design-grid angle
+def rbox(cx, cy, z0, W, H):
+    b = Part.makeBox(W, W, H, App.Vector(-W/2.0, -W/2.0, 0))  # centered in XY at origin
+    b.Placement = App.Placement(App.Vector(cx, cy, z0), ROT)   # rotate about center, then move
+    return b
+# pickets = [s for s in panel.Shape.Solids if s.BoundBox.ZLength > 1000]
+# new = [rbox(s.BoundBox.Center.x, s.BoundBox.Center.y, BASE, 10, H) for s in pickets]
+# panel.Shape = Part.makeCompound(new + rails)
+```
+
+Gotcha: slimming a multi-member assembly can open gaps the old thickness hid. If posts and pickets
+sat on slightly different lines (e.g. posts 35 mm proud of the picket line), the fat originals
+overlapped but the slim versions float apart. After slimming, verify members still touch
+(`postA.Shape.distToShape(panel.Shape)[0] == 0`); if not, put posts and pickets on ONE line (set
+`perp = mean(post perp coords)` for the whole run) and span the rails post-to-post.
+
+### Sloped rails -> thin bar between endpoints
+
+A sloped/kinked rail solid has a misleadingly large world-axis BB. Rebuild it as a thin bar between
+its two end centroids (centroid of the extreme ~15% of vertices along the segment's principal axis),
+oriented with `Rotation(zaxis, end-start)`. Split any L-shaped run into straight segments first.
+
+### Diamond / gunnebo mesh
+
+Model mesh as two families of thin diagonal bars at +/-45 deg in the `(run, height)` plane, each
+line clipped to the panel rectangle and mapped to world; aperture ~= `c_step / sqrt(2)`. Use
+`Part.makeCompound` (NOT `fuse` -- fusing hundreds of thin bars risks the freeze/crash noted under
+Boolean Operations). For a fence on sloping ground, drive the base Z from a piecewise-linear ground
+profile so the panel rakes with the slope.
+
 ---
 
 ## Boolean Operations for Openings
@@ -442,6 +515,26 @@ band_face = Part.Face(wire)
 ```
 
 Useful for perimeter footprints (drainage trenches, ring foundations, racetrack moats). The wire is also easy to edit later: change one vertex and the band shape updates.
+
+### Trimming a finished BSpline-faced solid can silently warp it (validate by BoundBox)
+
+A box `cut` (or any Boolean) against a solid whose faces are BSpline surfaces derived from a
+fragile or invalid shell (terrain shells, lofted surfaces, the `common`/`cut` results of those)
+can return a shape that reports `isValid() == True` yet is geometrically wrong: the BoundBox
+balloons far outside both inputs (one warped solid, NOT stray slivers), even though the volume
+looks plausible. `isValid()` alone does not catch this.
+
+Symptom: after `result = fragile_solid.cut(box)`, `result.BoundBox` extends well beyond both
+`fragile_solid` and `box`, while `len(result.Solids) == 1` and `result.isValid()` is True.
+
+Fixes:
+- Apply the trim EARLY, on the cleanest upstream intermediate (e.g. right after the first
+  `common`/`cut` in the build chain), not on the final capped solid. Boolean steps inside a
+  working build chain are usually clean; the identical cut on the finished shape may not be.
+- If the shape is produced by a rebuild script, bake the trim into the rebuild as an extra
+  cutter at that clean stage rather than post-processing the script's output.
+- ALWAYS validate by BoundBox, not just `isValid()`: a cut can only SHRINK extents, so assert
+  the result BB is contained within the input BB (allowing a small tolerance).
 
 ---
 
