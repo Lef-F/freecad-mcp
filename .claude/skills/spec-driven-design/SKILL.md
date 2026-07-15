@@ -54,7 +54,7 @@ Ask the user (or infer from context) the feature slug. Check `.designs/<doc-name
 
 - Active FreeCAD document name matches the feature's expected document (read from `spec.md` front matter if it exists).
 - Required tools for the upcoming phase are permitted (esp. WebFetch / WebSearch for any Research dispatches).
-- The em-dash hook and SubagentStop hook are configured (smoke-check by running `ls .claude/hooks/`).
+- The SubagentStop hook is configured AND actually firing. Verifying a guard's file exists is NOT the same as verifying it fires: check `~/.claude/spec-driven-design.log` shows a real `OK <path>` line for a recent dispatch. If every recent log line is a skip/`no expected_output`/`no subagent transcripts derivable`, treat the contract as UNENFORCED for this session and rely on the parent's own post-dispatch file check (see dispatching-design-subagents Step 6, which is authoritative regardless).
 - `.designs/<doc-name>/` exists and is gitignored (sanity check; should always be true).
 
 ### 3. Hand off to the phase skill

@@ -15,6 +15,12 @@ Read-only investigation of the codebase or FreeCAD source. Produces a structured
 ## Required tool surface
 - `Read`, `Grep`, `Glob`
 - `Bash` for `find`, `wc`, simple shell ops (no installs, no edits)
+- **Optional, when the investigation targets live application/document state (not just files on disk): a READ-ONLY live-model query tool** (for a FreeCAD design session this is `mcp__freecad__execute_code` with `capture_screenshot=False`; for other runtimes, whatever read-only query/introspection tool fits). This is first-class for design-session investigation, where most evidence comes from querying the running model, not from reading source files.
+
+Hard caveats on the live-query tool:
+- READ-ONLY. No mutation of the model. No object creation/deletion/edit.
+- No screenshot / visual capture (that bloats context and is not investigation; it belongs to a verification step).
+- If the subagent finds itself mutating state, it is no longer an Explore -- stop and re-dispatch as RPC-Exec.
 
 No Edit, no Write to source files. The subagent writes ONLY its findings file.
 
@@ -48,6 +54,7 @@ RETURN: Write findings to `<journal-path>/research/<topic-slug>.md`. Structure:
 - One section per numbered question, in order
 - Each section starts with the question, then the answer with citations
 - End with `## Open questions` for things you could not verify
+- End with a `## Claims I am asserting` ledger (see `reference/claims-ledger.md`). Any live-model identifier you report is `[assumption]` unless a read-only query confirmed it this run.
 
 Your chat reply: file path + 5-line executive summary + count of questions answered vs deferred.
 
@@ -59,6 +66,7 @@ Your chat reply: file path + 5-line executive summary + count of questions answe
 2. Number of questions is between 1 and 8 (more → split into multiple Explores).
 3. The journal `research/` subdir exists.
 4. If exploring vendor FreeCAD source, confirm `vendor/FreeCAD/` is present (run `scripts/setup-freecad-source.sh` if not).
+5. If any question requires live-state inspection, confirm the read-only live-model query tool is permitted in this session before dispatch (and that the live model / document is actually open).
 
 ## Anti-patterns to avoid
 - "Comprehensive deep dive into entire .claude/ directory" - produces 23 KB of narrative prose, useless. Replace with 6 specific questions.

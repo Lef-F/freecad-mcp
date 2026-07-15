@@ -13,8 +13,10 @@ Audit existing code / artefacts against a specific rubric. Output is a severity-
 
 ## Required tool surface
 - `Read`, `Grep`, `Glob`
+- **Optional (strongly recommended when the feature mutated live application/document state): a READ-ONLY live-model query tool** (FreeCAD session: `mcp__freecad__execute_code`, `capture_screenshot=False`). This lets the reviewer verify hypotheses against live state FIRST-HAND instead of trusting the build artifact -- which is the single biggest reducer of reviewer hallucination.
+- **For the Conventions archetype: read-only `Bash`** for inspecting the working-tree diff (`git status` / `git diff`), scanning artifacts for forbidden characters/encodings, and file stats. No writes, no test/lint execution.
 
-No write to source. The subagent writes ONLY its findings file. No Bash for running linters / tests - that's a separate verification step.
+No write to source. The subagent writes ONLY its findings file. Do NOT run linters or tests (that is a separate verification step, not a review).
 
 ## Prompt template
 
@@ -54,10 +56,10 @@ RETURN: Write findings to `<journal-path>/reviews/<archetype>.md`:
 - One section "Other findings" for issues not in hypotheses
 - `## Claims I am asserting` ledger at the end (see below)
 
-Required claims ledger:
-- [verified] each (file, line) you cited was read this turn
+Required claims ledger (shared convention -- see `reference/claims-ledger.md`):
+- [verified] each (file, line) or live-query result you cited was observed this turn
 - [unverified] anything you could not check (e.g., runtime behavior, downstream effects)
-- [assumption] anything you took at face value from the prompt
+- [assumption] anything you took at face value from the prompt or the build artifact
 - [out-of-scope] issues you noticed but did not investigate
 
 Your chat reply: file path + counts (bugs/improvements/nitpicks) + count of unverified claims.

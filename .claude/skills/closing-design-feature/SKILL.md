@@ -75,6 +75,7 @@ Copy `reference/closeout-template.md` to `journal/<feature-slug>/closeout.md` an
 Lessons in step 5 that apply broadly (not project-specific) should be added to:
 - `.claude/context/freecad-*.md` if it's a FreeCAD pattern / gotcha.
 - `~/Documents/Obsidian/Lef/` if it's a workflow / tooling insight (per global instructions).
+- **The relevant skill / template / hook file itself if the lesson is about the spec-driven-design flow misbehaving** (a phase skill, an archetype template, a reviewer brief, or a hook). Process lessons about the workflow tooling belong WITH the tooling, filed as an improvement against that file -- not buried in one project's closeout where they will be lost. If you cannot fix it in this session, at minimum record it as a follow-up that names the specific skill/template/hook to change.
 
 Lessons that are document-specific stay in `closeout.md` only.
 

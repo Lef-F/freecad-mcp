@@ -74,9 +74,10 @@ Add a row pointing to the new journal entry so the per-doc task list reflects ac
 ## Anti-patterns
 
 - Writing the spec without the user looking. The spec IS the alignment artefact, not a checkbox.
-- Vague acceptance criteria like "the wood fences look right". Replace with measurable claims.
+- Vague acceptance criteria like "make it look right". Replace with measurable claims.
 - Including implementation details in the spec. Spec says WHAT and WHY; plan says HOW.
 - Padding Out-of-scope with everything imaginable. Only list things that might plausibly be in scope.
+- Asserting live-model identifiers (property names, type ids, object/field names, API signatures) in the spec's Constraints or References as if they were facts. Unless you confirmed it against the live model this session, tag any such identifier "assumed -- to be verified in the plan/explore phase". An unverified identifier baked into the spec quietly becomes a wrong premise the plan trusts.
 
 ## Next phase
 

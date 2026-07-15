@@ -45,6 +45,8 @@ Examples of good hypotheses:
 
 Use `dispatching-design-subagents` with the Review archetype. Two subagents in one message:
 
+**Grant reviewers read-only live-state access when the feature mutated live state.** This is the single biggest reducer of reviewer hallucination: a reviewer that can query the running model verifies its hypotheses first-hand instead of inferring them from the build artifact (the exact "reviewer trusts a stale/wrong build log" failure these reviews exist to catch). Add the read-only live-model query tool to both reviewers' dispatch prompts; give the Conventions reviewer read-only `Bash` too (working-tree diff, encoding scans). Keep the no-source-write / no-test-execution prohibition.
+
 **Correctness reviewer**
 - Reference: `.claude/skills/reviewing-design-feature/reference/correctness-brief.md`
 - Inputs: build files + spec.md + changed source files
@@ -57,7 +59,7 @@ Use `dispatching-design-subagents` with the Review archetype. Two subagents in o
 - Hypotheses: not needed (the conventions checklist is the hypothesis set)
 - Expected output: `journal/<feature-slug>/reviews/conventions.md`
 
-Both subagent prompts MUST include `# expected_output: <absolute-path>` for the SubagentStop hook to verify.
+Both subagent prompts MUST include `# expected_output: <absolute-path>`. After they return, the parent reads each review file directly to confirm it landed (the SubagentStop hook is advisory only; never rely on its silence).
 
 ### 4. Wait for both reviewers
 

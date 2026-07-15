@@ -17,13 +17,22 @@ External-knowledge investigation (web docs, regulations, library APIs). Distinct
 
 ## CRITICAL pre-flight (parent MUST run before dispatching)
 
-**Verify WebFetch and WebSearch are permitted in the current session.** Run a probe:
+**Verify WebFetch and WebSearch are permitted in the current session.** Run a concrete probe from the PARENT before dispatching (do not delegate the probe to the subagent -- the point is to know the surface is live before you spend a dispatch):
 
-```bash
-# Quick probe: try fetching a known-safe URL. If it returns a permission denial,
-# DO NOT DISPATCH the Research subagent - it will silently fall back to training
-# data and confabulate authoritative-looking output.
 ```
+# Parent runs a single WebFetch against a stable neutral URL, e.g.:
+WebFetch(url="https://example.com", prompt="Return the first heading on this page.")
+
+# Interpret the result:
+# - Success (returns page content)               -> web surface is live; dispatch Research.
+# - "Permission to use WebFetch has been denied" -> DENIED. Do NOT dispatch Research;
+#                                                    it will silently fall back to
+#                                                    training data and confabulate.
+# - Network/404 on example.com specifically       -> retry once with a second neutral
+#                                                    URL before concluding denied.
+```
+
+The exact denial string to detect is `Permission to use WebFetch has been denied` (and the WebSearch equivalent). If you see it, escalate to the user or re-route the task to Explore against any locally-cached copies -- never proceed and hope.
 
 If the probe fails with "Permission to use WebSearch denied", the parent must either:
 1. Tell the user and request permission grant.

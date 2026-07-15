@@ -38,6 +38,8 @@ Each task has a single archetype tag. Read the matching reference file:
 
 The reference defines: required tool surface, prompt template, pre-flight checks, anti-patterns.
 
+**Archetype tool surfaces are defaults, not hard limits.** The parent MAY extend a task's tool surface when the specific task needs it (e.g., granting an Explore the read-only live-model query tool for a design-state investigation). When you extend, write the extension explicitly into the dispatch prompt's own "Tool surface" block so the subagent knows exactly what it has and the constraint stays visible. Keep extensions minimal and preserve each archetype's hard prohibitions (Explore/Review never mutate; Apply-Patch never runs tests).
+
 ### 3. Run pre-flight checks
 
 Per archetype reference. Common checks:
@@ -70,10 +72,11 @@ For parallel-eligible tasks, dispatch them in a single message with multiple Age
 
 When the subagent returns:
 1. Read its chat summary (should be a file path + 3-10 lines).
-2. Confirm the file at the magic comment path exists and is non-empty.
-3. If the SubagentStop hook warned that the file is missing, the subagent failed its contract: re-dispatch with explicit reminder, or escalate.
-4. Update the plan: mark the task with a check or annotate failure.
-5. Update the side-effect tracker if the task surfaced code changes.
+2. **PRIMARY verification (always do this yourself):** read the file at the expected_output path, confirm it exists, is non-empty, and actually meets the task's Acceptance criterion from the plan. This parent-side check is authoritative.
+3. The SubagentStop hook is an **advisory secondary signal only**. It may be silently inoperative (it has been before). NEVER treat its silence as success, and never skip the step-2 parent check because the hook "should have caught it".
+4. Parse the `## Claims I am asserting` ledger in the artifact. Any `[unverified]` or `[assumption]` row that a later task depends on must be confirmed (dispatch a follow-up) before building on it.
+5. Update the plan: mark the task with a check or annotate failure.
+6. Update the side-effect tracker if the task surfaced code changes.
 
 For Review-type subagents: parse the claims ledger. If any `unverified` or `assumption` rows are load-bearing for the next task, dispatch a follow-up to verify them before proceeding.
 
@@ -110,7 +113,8 @@ After all tasks done:
 - `reference/explore-template.md`
 - `reference/research-template.md`
 - `reference/review-template.md`
-- `.claude/hooks/subagent-output-check.py` (the verifier hook)
+- `reference/claims-ledger.md` (shared four-state claims ledger convention; recommended return for Explore, RPC-Exec, Review, and any verification-flavored task)
+- `.claude/hooks/subagent-output-check.py` (the verifier hook -- advisory secondary signal only; the parent's own file check in Step 6 is authoritative)
 
 ## Next phase
 

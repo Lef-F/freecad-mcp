@@ -32,6 +32,8 @@ For each numbered Acceptance criterion in the spec, identify:
 
 This is in-thread reasoning, not a subagent dispatch. Use AskUserQuestion only if the spec is ambiguous about an acceptance criterion (which should be rare since the spec was just approved).
 
+**Verify live-model identifiers before any mutation task depends on them.** Any identifier the plan relies on that describes live application/document state (a property name, type id, object/field name, API signature) MUST be either (a) verified this session via a read-only discovery query, or (b) explicitly marked "assumed -- a preceding discovery/Explore task verifies it". Never let a mutation (RPC-Exec / Apply-Patch) task be the first thing to touch an unverified identifier: a wrong assumed identifier propagates verbatim into the dispatch prompt and either fails loudly or, worse, mutates the wrong thing silently. If in doubt, order an Explore task first.
+
 ### 2. Decompose into tasks
 
 Each task has a single archetype from: `Explore`, `Research`, `RPC-Exec`, `Apply-Patch`, `Review`.
@@ -68,6 +70,7 @@ Before requesting approval, verify:
 - [ ] Each task's Expected output path is under the journal directory.
 - [ ] Each task's Acceptance criterion is checkable.
 - [ ] Tasks needing WebFetch have a `Research` archetype and the parent has confirmed web tools are permitted.
+- [ ] No mutation task (RPC-Exec / Apply-Patch) hard-codes a live-model identifier that hasn't been verified this session or flagged for a preceding discovery task.
 
 If any check fails, fix the plan before asking for approval.
 

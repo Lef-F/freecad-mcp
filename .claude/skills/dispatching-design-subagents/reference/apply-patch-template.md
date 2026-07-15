@@ -15,8 +15,9 @@ Surgical code edit with exact before/after blocks. The subagent's job is `apply_
 ## Required tool surface
 - `Read`
 - `Edit`
+- `Write` limited to the single expected_output build-log file (NOT for editing source -- source changes go through `Edit` only)
 
-No Bash, no WebFetch, no Write. The subagent does not run linters or tests; that's a separate verification step run by the parent or a reviewer.
+No Bash, no WebFetch. The subagent does not run linters or tests; that's a separate verification step run by the parent or a reviewer.
 
 ## Prompt template
 
