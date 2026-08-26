@@ -1,8 +1,9 @@
 ---
 name: exporting-freecad-to-web
-description: Sets up an interactive Three.js web viewer for any FreeCAD document. Covers
-  the export pipeline (FreeCAD -> glTF cleanup), viewer customization (title, solar
-  coordinates, model orientation offset), and local serving over the network.
+description: Sets up an interactive Three.js web viewer for any FreeCAD document. Two
+  architectures - baked glTF export (FreeCAD -> glTF cleanup, solar slider) and
+  procedural parametric (geometry built in JS from a parameter object, live
+  configurator sliders). Covers viewer customization, local serving, and deploy.
   Works with any document where objects are tagged MCP_Role=Final.
 ---
 
@@ -13,6 +14,23 @@ description: Sets up an interactive Three.js web viewer for any FreeCAD document
 When the user wants to publish a FreeCAD 3D model as an interactive browser-based
 viewer with realistic sun lighting and a time-of-day slider. Invoke at the start of
 a new web-export setup, or when resuming an existing one for a different document.
+
+## Two Viewer Architectures
+
+Pick the architecture FIRST, before creating any files:
+
+| | Baked glTF (this file's Steps) | Procedural parametric |
+|---|---|---|
+| Geometry | Exported from FreeCAD as .gltf | Built in JS from a `PARAMS` object |
+| Best for | Large / organic / Boolean-heavy models, static viewing | Small primitive-composable assemblies (boxes, extrusions with arcs, lathes) |
+| Interactivity | Orbit + solar slider | Live dimension sliders, toggles, engineering readouts (configurator) |
+| Payload | .gltf + .bin in exports/ | Single HTML, no exports/ dir |
+| Model updates | Re-run export script | Edit `PARAMS` (mirror the FreeCAD script's dict) |
+
+For the procedural parametric viewer, follow
+`reference/procedural-viewer.md` instead of Steps 1-7 below (it reuses the
+same template's renderer/lighting/controls scaffolding and documents what to
+keep and drop). The glTF pipeline continues below.
 
 ## Prerequisites
 

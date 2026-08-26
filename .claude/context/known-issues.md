@@ -43,6 +43,11 @@ Reference for known bugs, version-specific issues, and workarounds.
 - **What NOT to do**: don't blindly retry the timed-out call. If the operation creates objects, retry can leave the document in a half-created state (duplicate objects, stale references).
 - **When to actually worry**: if a follow-up lighter query ALSO times out, FreeCAD may be genuinely hung. Switch to the GUI to confirm. But most timeouts are just "the work was bigger than 30s".
 
+### MCP Client Disconnect Does Not Mean FreeCAD Is Down
+- **Symptom**: Mid-session, MCP tools become unavailable and the harness reports the freecad MCP server disconnected
+- **Root cause**: The MCP client/server link died, but the addon's XML-RPC server (port 9875) runs inside FreeCAD and survives the MCP client process
+- **Recovery**: Talk XML-RPC directly: `pgrep -fl -i freecad` to confirm the process, then `ServerProxy("http://127.0.0.1:9875", allow_none=True)` and call `ping()`, `list_documents()`, `execute_code(...)`. Save the document FIRST if there is unsaved work (the disconnect may precede a real crash). Full procedure: `.claude/skills/debugging-rpc-connection/SKILL.md`, section "Recovering a Live Session After MCP Client Disconnect"
+
 ### MCP/Addon Version Mismatch — `summary_only` Parameter
 - **Symptom**: If MCP server is 0.1.17+ but FreeCAD addon is older (pre-0.1.17), calling `get_objects` will fail with `TypeError: get_objects() takes 2 positional arguments but 3 were given` because the old addon doesn't accept the `summary_only` positional arg
 - **Fix**: Restart FreeCAD after deploying the updated addon to `Mod/FreeCADMCP/`
@@ -140,6 +145,11 @@ Pure bug-fix release on top of 1.1.0. Same user data dir, same Python, no API ch
 - **Symptom**: FreeCAD becomes unresponsive or crashes when fusing many complex lofted shapes (e.g., 18+ lofted planks)
 - **Root cause**: Boolean `fuse` on complex B-rep shapes is computationally expensive and can hit OCC kernel edge cases
 - **Workaround**: Use `Part.makeCompound()` for display-only grouping (fast, no boolean), or create individual `Part::Feature` objects in a group. Reserve `fuse` for when you actually need a single merged solid (e.g., for boolean cuts)
+
+### `saveImage()` Right After a View Change Captures Mid-Animation
+- **Symptom**: `view.viewFront(); view.fitAll(); view.saveImage(...)` in a single `execute_code` call produces a screenshot with the camera partway between orientations
+- **Root cause**: FreeCAD animates view transitions; `saveImage` in the same call fires while the animation is still running
+- **Fix**: Split into two calls: set the view (`viewFront()`, `fitAll()`) in one RPC call, wait ~2 seconds in the caller, then call `saveImage` in a second call
 
 ### FreeCAD `exec()` Only Handles ASCII in Python Code Strings
 - **Symptom**: `exec(open(...).read())` or `execute_code` fails with `'ascii' codec can't decode byte 0xc2`

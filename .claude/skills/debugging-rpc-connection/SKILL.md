@@ -58,3 +58,43 @@ Add temporary logging in `FreeCADRPC` methods using `FreeCAD.Console.PrintMessag
 - `ping()` returns `True` via raw XML-RPC connection
 - An MCP tool call succeeds end-to-end and returns expected data
 - Screenshots are returned as non-empty base64 strings (when in a supported view)
+
+## Recovering a Live Session After MCP Client Disconnect
+
+### When to Use
+- MCP tools become unavailable mid-session (the harness reports the freecad MCP server disconnected)
+- FreeCAD is still open. This does NOT mean FreeCAD died: the addon's XML-RPC server (port 9875) runs inside FreeCAD and survives the MCP client process
+
+### Steps
+
+1. Confirm the FreeCAD process is alive:
+```bash
+pgrep -fl -i freecad
+```
+
+2. Ping the RPC server directly, bypassing MCP:
+```bash
+uv run python3 -c "import xmlrpc.client; p = xmlrpc.client.ServerProxy('http://127.0.0.1:9875', allow_none=True); print(p.ping()); print(p.list_documents())"
+```
+
+3. **Save the document first** if there is unsaved work (the disconnect may precede a real crash):
+```python
+import xmlrpc.client
+p = xmlrpc.client.ServerProxy("http://127.0.0.1:9875", allow_none=True)
+result = p.execute_code(
+    "doc = FreeCAD.ActiveDocument\n"
+    "doc.save() if doc.FileName else doc.saveAs('/path/to/backup.FCStd')\n"
+    "print(doc.FileName)"
+)
+print(result)
+```
+Use `doc.saveAs(path)` for never-saved documents (empty `FileName`); `doc.save()` fails on those.
+
+4. Continue working through `p.execute_code(code_string)`. The result shape is `{'success': bool, 'message': str}` with printed output embedded in `message`. Everything the MCP `execute_code` tool can do works this way: queries, mutations, saving, screenshots.
+
+5. All the usual constraints still apply: ASCII-only code strings, one call at a time, GUI work goes through the addon's queue automatically.
+
+### Verification
+- `p.ping()` returns `True` and `p.list_documents()` lists the expected open documents
+- The save call returns `{'success': True, ...}` and `doc.FileName` prints a real path
+- A follow-up `execute_code` query returns expected document state

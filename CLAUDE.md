@@ -322,6 +322,7 @@ See `.claude/context/tool-lifecycle.md` for the full step-by-step guide with cod
 | `get_objects` returns raw XML-RPC fault | Unhandled serialization error | Fixed: `get_objects`/`get_object` wrap errors in `{"success": false}` |
 | `NoneType` error in `get_object` | Object name doesn't exist in document | Fixed: returns `{"success": false, "error": "Object '...' not found"}` |
 | `Connection refused` on tool call | FreeCAD not running or RPC server not started | Start FreeCAD, then click "Start MCP Server" in the addon toolbar |
+| MCP tools gone mid-session, FreeCAD still open | MCP client link died; addon's XML-RPC server (port 9875) survives it | Talk XML-RPC directly (save the doc first); see `debugging-rpc-connection` skill |
 
 ## Important Constants
 
